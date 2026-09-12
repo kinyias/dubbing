@@ -12,9 +12,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
-# Nạp router xử lý phiên âm và dịch thuật
+# Nạp router xử lý phiên âm, dịch thuật và TTS
 from router.transcribe_video import router as transcript_router
 from router.translate_segments import router as translate_router
+from router.tts_engines import router as tts_router
 
 # Thiết lập encoding cho console Windows
 if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
@@ -30,8 +31,8 @@ logging.basicConfig(
 logger = logging.getLogger("main")
 
 app = FastAPI(
-    title="Video Transcription & Translation API",
-    description="API Server nhận dạng giọng nói và dịch thuật phụ đề qua node_helper",
+    title="Video Transcription, Translation & TTS API",
+    description="API Server nhận dạng giọng nói, dịch thuật và tổng hợp giọng nói VieNeu-TTS",
     version="1.0.0",
 )
 
@@ -44,22 +45,27 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Đăng ký các router từ transcribe_video.py và translate_segments.py
+# Đăng ký các router từ transcribe_video.py, translate_segments.py và tts_engines.py
 app.include_router(transcript_router)
 app.include_router(translate_router)
+app.include_router(tts_router)
 
 
 @app.get("/")
 async def health_check():
     return {
         "status": "online",
-        "message": "Transcription & Translation API is running.",
+        "message": "Transcription, Translation & TTS API is running.",
         "endpoints": [
             "/api/transcript/transcribe-video",
             "/api/transcript/cancel-transcribe",
             "/api/transcript/translate-segments",
             "/api/transcript/cancel-translate",
             "/api/transcript/fetch-translate-models",
+            "/api/transcript/generate-tts-batch",
+            "/api/transcript/cancel-tts-batch",
+            "/api/transcript/generate-tts",
+            "/api/transcript/vieneu-voices",
         ],
     }
 
@@ -67,9 +73,9 @@ async def health_check():
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(description="Video Transcription API Server")
+    parser = argparse.ArgumentParser(description="Video Transcription & TTS API Server")
     parser.add_argument("--host", default="127.0.0.1", help="Địa chỉ host (mặc định: 127.0.0.1)")
-    parser.add_argument("--port", type=int, default=8005, help="Cổng chạy server (mặc định: 8005)")
+    parser.add_argument("--port", type=int, default=8000, help="Cổng chạy server (mặc định: 8000)")
     args = parser.parse_args()
 
     logger.info(f"Khởi động API Server tại http://{args.host}:{args.port} ...")
