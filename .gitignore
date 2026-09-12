@@ -1,0 +1,145 @@
+# ==========================================
+# Python
+# ==========================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+var/
+sdist/
+develop-eggs/
+.installed.cfg
+lib/
+lib64/
+
+# Virtual Environments
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Testing & Linting / Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+.mypy_cache/
+.ruff_cache/
+
+
+# ==========================================
+# Node.js & Dependencies
+# ==========================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+.npm/
+
+
+# ==========================================
+# Native Addons & Binaries
+# ==========================================
+# Bỏ qua các file .node được compile tạm thời, nhưng GIỮ LẠI native addon bắt buộc của dự án
+*.node
+!ezmax_node.node
+
+# Debug / Deobfuscated reference scripts (bỏ comment nếu không muốn commit lên git)
+# *.deobfuscated.js
+
+
+# ==========================================
+# Environment Variables & Sensitive Configurations
+# ==========================================
+.env
+.env.*
+*.env
+!*.env.example
+
+# File cấu hình chứa API keys / tokens cá nhân
+settings.json
+!settings.example.json
+
+
+# ==========================================
+# Media, Subtitle & Temporary Working Files
+# ==========================================
+# Thư mục tạm & cache xử lý audio/video
+temp/
+tmp/
+cache/
+output/
+outputs/
+exports/
+downloads/
+
+# File âm thanh & video tạm thời sinh ra trong quá trình xử lý
+*.mp3
+*.wav
+*.aac
+*.m4a
+*.flac
+*.ogg
+*.opus
+*.mp4
+*.mkv
+*.avi
+*.mov
+*.webm
+*.flv
+
+# File phụ đề tạm thời khi render video
+*.srt
+*.vtt
+temp_*.ass
+out_*.ass
+
+
+# ==========================================
+# Logs
+# ==========================================
+*.log
+logs/
+
+
+# ==========================================
+# IDE & Editor Files
+# ==========================================
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+*~
+
+
+# ==========================================
+# Operating System Specific
+# ==========================================
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
