@@ -60,46 +60,50 @@
 
     <script>
       (function () {
-        const isLocalDev =
-          window.location.hostname === 'localhost' ||
-          window.location.hostname === '127.0.0.1';
         const isTunnel =
           window.location.hostname.includes('trycloudflare.com') ||
           window.location.hostname.includes('loca.lt');
-        const BACKEND_BASE =
-          isLocalDev && window.location.port !== '8000'
-            ? 'http://127.0.0.1:8000'
-            : window.location.origin;
+        const isLocalHost =
+          window.location.hostname === 'localhost' ||
+          window.location.hostname === '127.0.0.1';
 
         const origFetch = window.fetch;
         window.fetch = function (input, init) {
-          if (
-            typeof input === 'string' &&
-            (input.startsWith('/api/') || input.startsWith('/health'))
-          ) {
-            if (isLocalDev && window.location.port !== '8000') {
-              input = BACKEND_BASE + input;
+          if (typeof input === 'string') {
+            if (isTunnel) {
+              // Thay thế bất kỳ request nào lỡ hardcode http://127.0.0.1:8000 hoặc http://localhost:8000 sang relative URL
+              input = input.replace(
+                /^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?/,
+                '',
+              );
             }
-          } else if (
-            input instanceof URL &&
-            (input.pathname.startsWith('/api/') ||
-              input.pathname.startsWith('/health'))
-          ) {
-            if (isLocalDev && window.location.port !== '8000') {
-              input = new URL(input.pathname + input.search, BACKEND_BASE);
+          } else if (input instanceof URL) {
+            if (
+              isTunnel &&
+              (input.hostname === '127.0.0.1' || input.hostname === 'localhost')
+            ) {
+              input = new URL(
+                input.pathname + input.search,
+                window.location.origin,
+              );
             }
           }
           return origFetch.call(this, input, init);
         };
+
         const OrigWS = window.WebSocket;
         window.WebSocket = function (url, proto) {
-          if (typeof url === 'string' && url.includes('/api/transcript/ws')) {
-            if (isLocalDev && window.location.port !== '8000') {
-              url = 'ws://127.0.0.1:8000/api/transcript/ws';
-            } else if (isTunnel || window.location.protocol === 'https:') {
+          if (typeof url === 'string') {
+            if (isTunnel || window.location.protocol === 'https:') {
               const wsProto =
                 window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-              url = `${wsProto}//${window.location.host}/api/transcript/ws`;
+              url = url.replace(
+                /^ws:\/\/(127\.0\.0\.1|localhost)(:\d+)?/,
+                `${wsProto}//${window.location.host}`,
+              );
+              if (!url.startsWith('ws://') && !url.startsWith('wss://')) {
+                url = `${wsProto}//${window.location.host}${url.startsWith('/') ? '' : '/'}${url}`;
+              }
             }
           }
           return proto ? new OrigWS(url, proto) : new OrigWS(url);
