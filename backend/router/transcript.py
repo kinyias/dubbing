@@ -1,3 +1,4 @@
+from core.node_bridge import run_node_script_sync
 import os
 import sys
 import json
@@ -185,3 +186,138 @@ async def websocket_endpoint(websocket: WebSocket):
     except Exception as e:
         logger.error(f"WebSocket error: {e}")
         ws_manager.disconnect(websocket)
+
+# ---------------------------------------------------------------------------
+# Voice Catalog (/api/transcript/voices)
+# ---------------------------------------------------------------------------
+
+_SYS_VOICES_CACHE: list = []
+_SYS_VOICES_CACHE_TIME: float = 0.0
+_SYS_VOICES_LOCK = asyncio.Lock()
+
+
+def _load_system_voices_from_node() -> list:
+    """Lấy danh sách 775 giọng từ ttsVoices.js qua Node.js."""
+    script = "console.log(JSON.stringify(require('./tts/ttsVoices').getAllVoices()))"
+    try:
+        proc = run_node_script_sync(script, timeout=15.0)
+        if proc and proc.stdout:
+            data = json.loads(proc.stdout.strip())
+            if isinstance(data, list):
+                return data
+    except Exception as e:
+        logger.warning(f"Không thể nạp giọng hệ thống từ ttsVoices.js: {e}")
+    return []
+
+
+@router.get("/voices")
+async def get_transcript_voices(refresh: bool = False):
+    """
+    Endpoint /api/transcript/voices:
+    Gộp toàn bộ giọng hệ thống (CapCut, Edge, ElevenLabs, FPT, Vbee, Zalo...), giọng clone OmniVoice, VieNeu.
+    """
+    global _SYS_VOICES_CACHE, _SYS_VOICES_CACHE_TIME
+
+    # 1. Lấy giọng hệ thống từ Cache hoặc gọi Node
+    now = time.time()
+    if refresh or not _SYS_VOICES_CACHE or (now - _SYS_VOICES_CACHE_TIME > 300.0):
+        async with _SYS_VOICES_LOCK:
+            if refresh or not _SYS_VOICES_CACHE or (now - _SYS_VOICES_CACHE_TIME > 300.0):
+                _SYS_VOICES_CACHE = await asyncio.to_thread(_load_system_voices_from_node)
+                _SYS_VOICES_CACHE_TIME = now
+
+    all_voices = []
+
+    # 2. Gộp giọng hệ thống (CapCut, Edge, ElevenLabs, FPT, Vbee, Zalo, MiniMax, SiliconFlow)
+    for sv in _SYS_VOICES_CACHE:
+        if isinstance(sv, dict):
+            v_id = sv.get("voiceId") or sv.get("id")
+            all_voices.append({
+                **sv,
+                "voiceId": v_id,
+                "id": v_id,
+                "label": sv.get("label") or v_id,
+            })
+
+    # 3. Gộp giọng VieNeu presets (nếu có module VieNeu)
+    try:
+        import dataclasses
+        from service.vieneu import list_preset_voices as vieneu_registry
+        vieneu_presets = vieneu_registry() or []
+        for vp in vieneu_presets:
+            if isinstance(vp, dict):
+                v_id = vp.get("voiceId") or vp.get("id") or vp.get("voice_id")
+                name = vp.get("label") or vp.get("name") or vp.get("display_name") or v_id
+                gender = vp.get("gender") or "male"
+                region = vp.get("region") or "VN"
+                style = vp.get("style") or ""
+                desc = vp.get("description") or ""
+            elif isinstance(vp, (tuple, list)):
+                name = str(vp[0])
+                v_id = str(vp[1] if len(vp) > 1 else vp[0])
+                gender = "female" if any(w in name.lower() for w in ["thục", "mai", "linh", "trang", "huyền", "dung", "ly", "trân", "duyên", "quỳnh", "thanh"]) else "male"
+                region = "VN"
+                style = ""
+                desc = "Giọng đọc VieNeu chất lượng cao"
+            elif isinstance(vp, str):
+                v_id = name = vp
+                gender = "female" if any(w in name.lower() for w in ["thục", "mai", "linh", "trang", "huyền", "dung", "ly", "trân", "duyên", "quỳnh", "thanh"]) else "male"
+                region = "VN"
+                style = ""
+                desc = "Giọng đọc VieNeu chất lượng cao"
+            elif dataclasses.is_dataclass(vp) or hasattr(vp, "voice_id"):
+                v_id = getattr(vp, "voice_id", "") or getattr(vp, "id", "")
+                name = getattr(vp, "name", "") or getattr(vp, "label", "") or v_id
+                gender = getattr(vp, "gender", "male")
+                region = getattr(vp, "region", "VN")
+                style = getattr(vp, "style", "")
+                desc = getattr(vp, "description", "")
+            else:
+                continue
+
+            if not v_id:
+                continue
+
+            full_voice_id = v_id if v_id.startswith("vieneu:") else f"vieneu:{v_id}"
+
+            all_voices.append({
+                "voiceId": full_voice_id,
+                "id": full_voice_id,
+                "label": f"{name} (VieNeu)" if not name.endswith("(VieNeu)") else name,
+                "name": name,
+                "display_name": name,
+                "engine": "vieneu",
+                "gender": gender,
+                "region": region,
+                "lang": "vi",
+                "language": "vi",
+                "style": style,
+                "description": desc,
+                "userCreated": False,
+            })
+    except Exception as e:
+        logger.warning(f"Lỗi khi đọc giọng VieNeu presets: {e}")
+
+    # 4. Gộp giọng do người dùng tự tạo/clone (nếu có trong user_voices.json)
+    try:
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        uv_file = os.path.join(base_dir, "user_voices.json")
+        if os.path.isfile(uv_file):
+            with open(uv_file, "r", encoding="utf-8") as f:
+                user_voices = json.load(f)
+                if isinstance(user_voices, list):
+                    for uv in user_voices:
+                        if isinstance(uv, dict):
+                            uv_id = uv.get("voiceId") or uv.get("id")
+                            all_voices.append({
+                                **uv,
+                                "voiceId": uv_id,
+                                "id": uv_id,
+                                "label": uv.get("label") or uv.get("name") or uv_id,
+                                "engine": uv.get("engine") or "omnivoice",
+                                "userCreated": True,
+                            })
+    except Exception as e:
+        logger.warning(f"Lỗi khi đọc giọng người dùng: {e}")
+
+    return all_voices

@@ -26,7 +26,9 @@ if BASE_DIR not in sys.path:
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-from fastapi import FastAPI, Request
+import json
+import time
+from fastapi import FastAPI, Request, Form, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -130,6 +132,132 @@ async def get_accel_status():
 
 @app.get("/api/downloader/jobs")
 async def get_downloader_jobs():
+    return []
+
+# -------------------------------------------------------------
+# Quản lý giọng mẫu người dùng (User Cloned Voices & Favorites)
+# -------------------------------------------------------------
+USER_VOICES_FILE = os.path.join(BASE_DIR, "user_voices.json")
+USER_FAVORITES_FILE = os.path.join(BASE_DIR, "user_favorites.json")
+
+def _load_user_voices() -> list:
+    if os.path.isfile(USER_VOICES_FILE):
+        try:
+            with open(USER_VOICES_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                return data if isinstance(data, list) else []
+        except Exception:
+            pass
+    return []
+
+def _save_user_voices(data: list):
+    try:
+        with open(USER_VOICES_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        logger.error(f"Lỗi lưu user voices: {e}")
+
+def _load_user_favorites() -> list:
+    if os.path.isfile(USER_FAVORITES_FILE):
+        try:
+            with open(USER_FAVORITES_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                return data if isinstance(data, list) else []
+        except Exception:
+            pass
+    return []
+
+def _save_user_favorites(data: list):
+    try:
+        with open(USER_FAVORITES_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        logger.error(f"Lỗi lưu user favorites: {e}")
+
+@app.get("/api/user/voices")
+async def get_user_voices():
+    return _load_user_voices()
+
+@app.post("/api/user/voices")
+async def create_user_voice(
+    name: str = Form(...),
+    ref_text: str = Form(""),
+    ref_audio: UploadFile = File(None),
+    engine: str = Form("omnivoice"),
+):
+    voices = _load_user_voices()
+    voice_id = f"{engine}:{int(time.time())}_{name.replace(' ', '_')}"
+    audio_rel_path = ""
+    if ref_audio:
+        audio_dir = os.path.join(BASE_DIR, "audio", "custom_voices")
+        os.makedirs(audio_dir, exist_ok=True)
+        save_path = os.path.join(audio_dir, f"{int(time.time())}_{ref_audio.filename}")
+        with open(save_path, "wb") as f:
+            f.write(await ref_audio.read())
+        audio_rel_path = save_path
+
+    new_voice = {
+        "id": voice_id,
+        "voiceId": voice_id,
+        "name": name,
+        "label": name,
+        "ref_text": ref_text,
+        "audio_path": audio_rel_path,
+        "engine": engine,
+        "owner": "local",
+        "userCreated": True,
+    }
+    voices.append(new_voice)
+    _save_user_voices(voices)
+    return {"success": True, "message": f"Đã thêm “{name}” vào kho.", "voice": new_voice}
+
+@app.delete("/api/user/voices/{voice_id:path}")
+async def delete_user_voice(voice_id: str):
+    voices = _load_user_voices()
+    voices = [v for v in voices if v.get("id") != voice_id and v.get("voiceId") != voice_id]
+    _save_user_voices(voices)
+    return {"success": True, "message": "Đã xóa giọng thành công!"}
+
+@app.get("/api/user/voice-favorites")
+async def get_user_voice_favorites():
+    return {"favorites": _load_user_favorites()}
+
+@app.post("/api/user/voice-favorites")
+async def set_user_voice_favorites(body: dict):
+    v_id = body.get("voiceId")
+    is_fav = body.get("favorite", True)
+    favs = set(_load_user_favorites())
+    if v_id:
+        if is_fav:
+            favs.add(v_id)
+        else:
+            favs.discard(v_id)
+    fav_list = list(favs)
+    _save_user_favorites(fav_list)
+    return {"favorites": fav_list}
+
+@app.get("/api/tts-engines/status")
+async def get_tts_engines_status():
+    return {
+        "engines": [
+            {"key": "capcut", "name": "CapCut", "installed": True, "ready": True, "modelsReady": True, "status": "ready"},
+            {"key": "edge", "name": "Edge TTS", "installed": True, "ready": True, "modelsReady": True, "status": "ready"},
+            {"key": "vieneu", "name": "VieNeu", "installed": True, "ready": True, "modelsReady": True, "status": "ready"},
+            {"key": "omnivoice", "name": "OmniVoice", "installed": True, "ready": True, "modelsReady": True, "status": "ready"},
+        ],
+        "ttsGpuLane": {
+            "installed": True,
+            "accelEnabled": True,
+            "planAllowed": True,
+        }
+    }
+
+@app.get("/api/history")
+async def get_tts_history():
+    return []
+
+@app.get("/api/queue")
+async def get_tts_queue():
     return []
 
 # -------------------------------------------------------------
