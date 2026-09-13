@@ -36,6 +36,7 @@ from service.handle_video import (
     extract_and_concat_clean_audio,
     execute_dubbing_pipeline_for_stream_copy,
 )
+from service.storage_service import upload_file_to_storage_to
 
 logger = logging.getLogger("router_hongguo")
 
@@ -712,6 +713,24 @@ async def batch_download_and_dubbing_hongguo(
         )
     )
 
+    # Chạy tác vụ ngầm upload video nối ghép stream copy gốc lên storage.to
+    concat_video_storage_url = ""
+    
+    def _upload_concat_video_bg():
+        nonlocal concat_video_storage_url
+        if os.path.exists(concat_stream_copy_video):
+            try:
+                ws_manager.broadcast_log_sync(op_id, f"[storage.to] Đang tải ngầm video nối ghép stream copy gốc lên storage.to...")
+                up_res = upload_file_to_storage_to(concat_stream_copy_video)
+                if up_res and up_res.get("success"):
+                    concat_video_storage_url = up_res.get("url", "")
+                    ws_manager.broadcast_log_sync(op_id, f"[storage.to] Upload video stream copy thành công: {concat_video_storage_url}")
+            except Exception as exc:
+                logger.warning(f"[storage.to] Upload video stream copy gốc thất bại: {exc}")
+
+    concat_upload_thread = threading.Thread(target=_upload_concat_video_bg, daemon=True)
+    concat_upload_thread.start()
+
     # 6. Pipeline Lồng tiếng: Transcribe -> Translate -> TTS -> Timing -> Mix & Mux
     out_name = req.output_filename
     if not out_name:
@@ -757,7 +776,16 @@ async def batch_download_and_dubbing_hongguo(
         progress_callback=_progress_cb,
     )
 
+    # Chờ thread upload video stream copy gốc ngầm hoàn tất để lấy link mà không gửi bừa giữa chừng
+    if 'concat_upload_thread' in locals() and concat_upload_thread.is_alive():
+        ws_manager.broadcast_log_sync(op_id, "[storage.to] Đang chờ hoàn tất upload ngầm video stream copy gốc...")
+        concat_upload_thread.join()
+
     out_size = os.path.getsize(final_dubbed_output) if os.path.exists(final_dubbed_output) else 0
+
+    original_srt_url = dubbing_res.get("originalSrtUrl", "")
+    translated_srt_url = dubbing_res.get("translatedSrtUrl", "")
+    dubbed_video_url = dubbing_res.get("dubbedVideoUrl", "")
 
     ws_manager.broadcast_op_progress_sync(
         op="hongguo_dubbing",
@@ -769,6 +797,10 @@ async def batch_download_and_dubbing_hongguo(
         message=f"Hoàn thành xuất sắc video lồng tiếng: {os.path.basename(final_dubbed_output)}",
         save_dir=target_save_dir,
         output_file=final_dubbed_output,
+        original_srt_url=original_srt_url,
+        translated_srt_url=translated_srt_url,
+        dubbed_video_url=dubbed_video_url,
+        concat_video_storage_url=concat_video_storage_url,
     )
     ws_manager.broadcast_log_sync(
         op_id, f"[Hồng Quả] ✓ Đã hoàn thành toàn bộ quá trình tải và lồng tiếng! File: {final_dubbed_output}"
@@ -785,6 +817,11 @@ async def batch_download_and_dubbing_hongguo(
         "output_size_bytes": out_size,
         "segments_count": dubbing_res.get("segmentsCount", 0),
         "duration": dubbing_res.get("duration", 0.0),
+        "original_srt_url": original_srt_url,
+        "translated_srt_url": translated_srt_url,
+        "dubbed_video_url": dubbed_video_url,
+        "concat_video_storage_url": concat_video_storage_url,
+        "storage_to": dubbing_res.get("storageTo", {}),
     }
 
 

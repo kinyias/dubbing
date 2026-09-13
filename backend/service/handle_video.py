@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from service.media_service import get_ffmpeg_path, get_ffprobe_path
+from service.storage_service import upload_file_to_storage_to
 
 logger = logging.getLogger("service_handle_video")
 
@@ -668,6 +669,35 @@ def mux_video_with_ducked_background_and_tts(
         logger.error(f"[Mux Final Video] Lỗi mux video & audio: {res.stderr}")
         raise RuntimeError(f"Lỗi khi ghép audio và video stream copy: {res.stderr}")
 
+# Helper export SRT
+def export_segments_to_srt(segments: List[Dict[str, Any]], field: str = "text") -> str:
+    """Chuyển đổi danh sách segments thành chuỗi định dạng SRT chuẩn."""
+    def _format_time(seconds: float) -> str:
+        ms = int(round(seconds * 1000))
+        hrs = ms // 3600000
+        ms %= 3600000
+        mins = ms // 60000
+        ms %= 60000
+        secs = ms // 1000
+        ms %= 1000
+        return f"{hrs:02d}:{mins:02d}:{secs:02d},{ms:03d}"
+
+    lines = []
+    idx = 1
+    for seg in segments:
+        text = str(seg.get(field) or seg.get("translation") or seg.get("text") or "").strip()
+        if not text:
+            continue
+        st = float(seg.get("plannedStart", seg.get("startTime", 0.0)))
+        et = float(seg.get("plannedEnd", seg.get("endTime", 0.0)))
+        lines.append(f"{idx}")
+        lines.append(f"{_format_time(st)} --> {_format_time(et)}")
+        lines.append(text)
+        lines.append("")
+        idx += 1
+    return "\n".join(lines)
+
+
 # ---------------------------------------------------------------------------
 # 7. Complete Dubbing Pipeline Execution from Audio / Stream Copy Video
 # ---------------------------------------------------------------------------
@@ -763,6 +793,30 @@ async def execute_dubbing_pipeline_for_stream_copy(
     if log_callback:
         log_callback(f"[Dubbing Pipeline] Nhận diện xong {len(segments)} phân đoạn lời thoại.")
 
+    # Tự động xuất và upload srt_original.srt lên storage.to ngay sau bước ASR
+    storage_urls = {
+        "originalSrtUrl": "",
+        "translatedSrtUrl": "",
+        "dubbedVideoUrl": "",
+    }
+
+    original_srt_path = os.path.join(work_dir, "srt_original.srt")
+    try:
+        with open(original_srt_path, "w", encoding="utf-8") as f:
+            f.write(export_segments_to_srt(segments, field="text"))
+        if os.path.exists(original_srt_path):
+            if log_callback:
+                log_callback("[Dubbing Pipeline] Đang upload srt_original.srt lên storage.to...")
+            up_orig = upload_file_to_storage_to(original_srt_path)
+            if up_orig and up_orig.get("success"):
+                storage_urls["originalSrtUrl"] = up_orig.get("url", "")
+                if log_callback:
+                    log_callback(f"[storage.to] Đã upload srt_original.srt thành công: {storage_urls['originalSrtUrl']}")
+                if progress_callback:
+                    progress_callback("asr_upload", 30, f"Đã upload srt_original: {storage_urls['originalSrtUrl']}")
+    except Exception as exc:
+        logger.warning(f"[Dubbing Pipeline] Xuất/Upload srt_original.srt thất bại: {exc}")
+
     # 2. Translate Segments
     if progress_callback:
         progress_callback("translate", 35, f"Đang dịch {len(segments)} câu sang '{target_lang}'...")
@@ -831,6 +885,24 @@ async def execute_dubbing_pipeline_for_stream_copy(
 
     if log_callback:
         log_callback(f"[Dubbing Pipeline] Đã hoàn thành dịch thuật {len(segments)} câu.")
+
+    # Tự động xuất và upload srt_translated.srt lên storage.to ngay sau bước Translate
+    translated_srt_path = os.path.join(work_dir, "srt_translated.srt")
+    try:
+        with open(translated_srt_path, "w", encoding="utf-8") as f:
+            f.write(export_segments_to_srt(segments, field="translation"))
+        if os.path.exists(translated_srt_path):
+            if log_callback:
+                log_callback("[Dubbing Pipeline] Đang upload srt_translated.srt lên storage.to...")
+            up_trans = upload_file_to_storage_to(translated_srt_path)
+            if up_trans and up_trans.get("success"):
+                storage_urls["translatedSrtUrl"] = up_trans.get("url", "")
+                if log_callback:
+                    log_callback(f"[storage.to] Đã upload srt_translated.srt thành công: {storage_urls['translatedSrtUrl']}")
+                if progress_callback:
+                    progress_callback("translate_upload", 50, f"Đã upload srt_translated: {storage_urls['translatedSrtUrl']}")
+    except Exception as exc:
+        logger.warning(f"[Dubbing Pipeline] Xuất/Upload srt_translated.srt thất bại: {exc}")
 
     # 3. Generate TTS Batch
     norm_voice = normalize_voice_id(voice_id, "Ngọc Huyền")
@@ -940,8 +1012,27 @@ async def execute_dubbing_pipeline_for_stream_copy(
         ffmpeg_bin=ffmpeg_bin,
     )
 
+    # 6. Upload Output Video lên storage.to
+    if log_callback:
+        log_callback("[Dubbing Pipeline] Bước 6/6: Đang tải video lồng tiếng đã hoàn tất lên storage.to...")
+
+    # Upload output dubbed video
+    if os.path.exists(output_dubbed_video_path):
+        try:
+            def _up_video_prog(pct: float, msg: str):
+                if progress_callback:
+                    progress_callback("upload", 95, f"Đang upload video lên storage.to: {pct:.1f}%")
+
+            up_vid = upload_file_to_storage_to(output_dubbed_video_path, on_progress=_up_video_prog)
+            if up_vid and up_vid.get("success"):
+                storage_urls["dubbedVideoUrl"] = up_vid.get("url", "")
+                if log_callback:
+                    log_callback(f"[storage.to] Đã upload video lồng tiếng thành công: {storage_urls['dubbedVideoUrl']}")
+        except Exception as exc:
+            logger.warning(f"[Dubbing Pipeline] Upload video lồng tiếng lên storage.to thất bại: {exc}")
+
     if progress_callback:
-        progress_callback("completed", 100, "Hoàn tất lồng tiếng video thành công!")
+        progress_callback("completed", 100, "Hoàn tất lồng tiếng và upload storage.to thành công!")
     if log_callback:
         log_callback(f"[Dubbing Pipeline] Hoàn tất xuất sắc video lồng tiếng: '{output_dubbed_video_path}'")
 
@@ -951,5 +1042,9 @@ async def execute_dubbing_pipeline_for_stream_copy(
         "segmentsCount": len(segments),
         "duration": media_duration,
         "segments": segments,
+        "storageTo": storage_urls,
+        "originalSrtUrl": storage_urls["originalSrtUrl"],
+        "translatedSrtUrl": storage_urls["translatedSrtUrl"],
+        "dubbedVideoUrl": storage_urls["dubbedVideoUrl"],
     }
 

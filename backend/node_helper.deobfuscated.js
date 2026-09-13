@@ -11086,7 +11086,7 @@ function rm(_0x469f76) {
 function hs(_0xc38996, _0x5b3424) {
   let _0x2f3a1b = new Set(["speed_up_tts", "stretch_video", "natural_flow"]);
   let _0x18dbf9 = new Set(["ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow", "slower", "veryslow"]);
-  let _0x4631a1 = "speed_up_tts";
+  let _0x4631a1 = _0xc38996.fitMode || "natural_flow";
   let _0x558149 = _0xc38996.preset || _0x5b3424.exportPreset || "medium";
   let _0x37b6ae = new Set([480, 720, 1080, 1440, 2160]);
   let _0x4d9626 = new Set([24, 25, 30, 50, 60]);
