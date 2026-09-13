@@ -1,0 +1,21 @@
+# Web Framework & API
+fastapi>=0.100.0
+uvicorn[standard]>=0.22.0
+pydantic>=2.0.0
+requests>=2.28.0
+
+# Scientific & Audio / Video Processing
+numpy>=1.24.0
+
+# Protocol Buffers (dùng trong service/liushen)
+protobuf>=3.20.0
+pycryptodome>=3.20,<4
+betterproto==1.2.5
+gmssl>=3.2,<4
+snowland_smx>=0.3.1,<0.4
+pyinstaller>=6.0,<7
+beautifulsoup4>=4.12,<5
+lxml>=5.0,<6
+tqdm>=4.66,<5
+pyngrok>=7.0,<8
+vieneu==3.6.4
