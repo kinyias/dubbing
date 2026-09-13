@@ -44,6 +44,7 @@ from router.transcript import router as dialog_ws_router
 from router.translate_segments import router as translate_router
 from router.tts_engines import router as tts_router
 from router.account import router as account_router
+from router.hongguo import router as hongguo_router
 
 from core.ws_manager import ws_manager
 
@@ -84,6 +85,7 @@ app.include_router(timing_router)
 app.include_router(export_router)
 app.include_router(pipeline_router)
 app.include_router(account_router)
+app.include_router(hongguo_router)
 
 # -------------------------------------------------------------
 # Các API bổ trợ cho Frontend UI (Branding, Account, Health,...)

@@ -17,7 +17,8 @@ develop-eggs/
 .installed.cfg
 lib/
 lib64/
-
+videos/
+src/
 # Virtual Environments
 venv/
 .venv/
