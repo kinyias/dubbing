@@ -190,7 +190,7 @@ async def api_transcribe_video(req_payload: Union[TranscribeRequest, Dict[str, A
             detail="Missing 'videoPath' parameter in request.",
         )
 
-    engine = (req.get("transcribeEngine") or "auto").lower().strip()
+    engine = (req.get("transcribeEngine") or "capcut").lower().strip()
     op_id = req.get("opId") or f"transcribe_{uuid.uuid4().hex[:12]}"
     video_segments = req.get("videoSegments") or []
 

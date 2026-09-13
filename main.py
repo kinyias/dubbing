@@ -12,9 +12,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
-# Nạp router xử lý phiên âm, dịch thuật, TTS, timing plan và xuất video
+# Nạp router xử lý phiên âm, dịch thuật, TTS, timing plan, xuất video và pipeline toàn trình
 from router.compute_time_plan import router as timing_router
 from router.export import router as export_router
+from router.pipeline import router as pipeline_router
 from router.transcribe_video import router as transcript_router
 from router.translate_segments import router as translate_router
 from router.tts_engines import router as tts_router
@@ -47,19 +48,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Đăng ký các router từ transcribe_video.py, translate_segments.py, tts_engines.py, compute_time_plan.py và export.py
+# Đăng ký các router từ transcribe_video.py, translate_segments.py, tts_engines.py, compute_time_plan.py, export.py và pipeline.py
 app.include_router(transcript_router)
 app.include_router(translate_router)
 app.include_router(tts_router)
 app.include_router(timing_router)
 app.include_router(export_router)
+app.include_router(pipeline_router)
 
 
 @app.get("/")
 async def health_check():
     return {
         "status": "online",
-        "message": "Transcription, Translation, TTS, Timing Plan & Export Video API is running.",
+        "message": "Transcription, Translation, TTS, Timing Plan, Export Video & End-to-End Pipeline API is running.",
         "endpoints": [
             "/api/transcript/transcribe-video",
             "/api/transcript/cancel-transcribe",
@@ -74,6 +76,10 @@ async def health_check():
             "/api/transcript/verify-dubbing-fit",
             "/api/transcript/export-video",
             "/api/transcript/cancel-export",
+            "/api/transcript/pipeline",
+            "/api/transcript/run-pipeline",
+            "/api/transcript/cancel-pipeline",
+            "/api/transcript/pipeline-status/{op_id}",
         ],
     }
 
