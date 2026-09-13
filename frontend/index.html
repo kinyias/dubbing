@@ -3140,24 +3140,6 @@
           video rồi thử lại.
         </div>
 
-        <!-- A6: Free-tier export banner (watermark + 05:00 duration limit + upgrade CTA).
-                   Hidden for paid/unrestricted plans; shown when export_policy caps duration or
-                   watermarks. #export-duration-note holds the live "MM:SS / 05:00" line (and turns
-                   red past the limit). JS: js/transcript/project.js updateExportPolicyUi(). -->
-        <div id="export-free-banner" class="export-free-banner hidden">
-          <div class="export-free-head">
-            <span class="material-symbols-rounded" style="font-size:18px;">workspace_premium</span>
-            <span>Gói Free</span>
-          </div>
-          <ul class="export-free-list">
-            <li>Xuất video tối đa 05:00</li>
-            <li>Video sẽ có logo EZMAXSOFT</li>
-          </ul>
-          <div id="export-duration-note" class="export-duration-note hidden"></div>
-          <button id="export-upgrade-btn" type="button" class="export-btn export-btn-primary export-upgrade-btn">
-            Nâng cấp để bỏ logo và xuất video dài
-          </button>
-        </div>
 
         <!-- The whole field is #export-filename-label (a <label>) so batch mode can hide
                    it wholesale (batchUi.js) and clicking the label focuses the input. -->

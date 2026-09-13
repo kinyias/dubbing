@@ -43,6 +43,7 @@ from router.transcribe_video import router as transcript_router
 from router.transcript import router as dialog_ws_router
 from router.translate_segments import router as translate_router
 from router.tts_engines import router as tts_router
+from router.account import router as account_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -74,6 +75,7 @@ app.include_router(tts_router)
 app.include_router(timing_router)
 app.include_router(export_router)
 app.include_router(pipeline_router)
+app.include_router(account_router)
 
 # -------------------------------------------------------------
 # Các API bổ trợ cho Frontend UI (Branding, Account, Health,...)
@@ -95,23 +97,6 @@ async def get_branding():
         "name_suffix": "sub",
         "slogan": "AI Subtitle & Dubbing Studio",
         "logo_icon": "fa-solid fa-microphone",
-    }
-
-@app.get("/api/account")
-async def get_account():
-    return {
-        "plan": "pro",
-        "plan_name": "Pro VIP",
-        "expires_at": None,
-        "machine_id": "LOCAL-HOST",
-        "machine_short": "LOCAL-HOST",
-        "export_policy": {
-            "tier": "pro",
-            "max_output_duration_sec": 86400,
-            "max_project_duration_sec": 86400,
-            "watermark_profile": None,
-            "subtitle_export_allowed": True
-        }
     }
 
 @app.get("/api/accel/status")
