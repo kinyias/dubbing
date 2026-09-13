@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional, Union
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
+from core.ws_manager import ws_manager
 from service.vieneu import (
     cancel_tts_op,
     generate_tts_batch_sync,
@@ -106,6 +107,9 @@ async def api_generate_tts_batch(req_payload: Union[TtsBatchRequest, Dict[str, A
     logger.info(
         f"[TTS Batch] Bắt đầu xử lý opId='{op_id}', language='{language}', số lượng câu={len(items)}"
     )
+    if op_id:
+        await ws_manager.broadcast_log(op_id, f"[TTS] Bắt đầu tạo giọng đọc batch ({len(items)} câu)...")
+        await ws_manager.broadcast_op_progress("tts-batch", op_id, done=0, total=len(items), pct=0.0, stage="start")
 
     try:
         # Chạy infer_batch trong thread pool riêng để không chặn async loop của FastAPI
@@ -115,9 +119,14 @@ async def api_generate_tts_batch(req_payload: Union[TtsBatchRequest, Dict[str, A
             op_id=op_id,
             language=language,
         )
+        if op_id:
+            await ws_manager.broadcast_op_progress("tts-batch", op_id, done=len(items), total=len(items), pct=100.0, stage="done")
+            await ws_manager.broadcast_log(op_id, f"[TTS] Hoàn tất tạo giọng đọc batch ({len(items)} câu).")
         return response
     except Exception as e:
         logger.error(f"[TTS Batch] Thất bại khi sinh giọng nói batch: {e}", exc_info=True)
+        if op_id:
+            await ws_manager.broadcast_error(op_id, f"Lỗi tổng hợp giọng nói batch: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Lỗi tổng hợp giọng nói batch: {str(e)}",
@@ -141,6 +150,7 @@ async def api_cancel_tts_batch(body: Union[CancelTtsRequest, Dict[str, Any]]):
     if op_id:
         cancel_tts_op(op_id)
         logger.info(f"[TTS Batch] Đã tiếp nhận yêu cầu hủy opId={op_id}")
+        await ws_manager.broadcast_log(op_id, f"[TTS] Đã tiếp nhận yêu cầu hủy batch opId={op_id}")
 
     return {"status": "cancelled", "opId": op_id}
 

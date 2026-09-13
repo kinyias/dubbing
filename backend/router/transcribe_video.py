@@ -25,6 +25,7 @@ from core.node_bridge import (
     cancel_node_helper,
     run_node_helper,
 )
+from core.ws_manager import ws_manager
 
 logger = logging.getLogger("router_custom_transcript")
 
@@ -209,10 +210,46 @@ async def api_transcribe_video(req_payload: Union[TranscribeRequest, Dict[str, A
         "opId": op_id,
     }
 
+    await ws_manager.broadcast_log(op_id, f"[Transcribe] Bắt đầu nhận dạng video ({engine})...")
+    await ws_manager.broadcast_op_progress(
+        op="transcribe",
+        op_id=op_id,
+        stage="init",
+        engine=engine,
+        message=f"Bắt đầu nhận dạng ({engine})..."
+    )
+
+    async def _on_event(event: dict):
+        if not isinstance(event, dict):
+            return
+        if "opId" not in event:
+            event["opId"] = op_id
+        await ws_manager.broadcast_json(event)
+
+        stage = event.get("stage")
+        if stage == "denoise":
+            await ws_manager.broadcast_log(op_id, "[Transcribe] Đang lọc tạp âm âm thanh (denoise)...")
+        elif stage == "asr":
+            asr_engine = event.get("engine") or engine
+            done = event.get("done")
+            total = event.get("total")
+            if done is not None and total is not None and int(total) > 0:
+                pct = round(int(done) / int(total) * 100, 1)
+                await ws_manager.broadcast_log(
+                    op_id, f"[Transcribe] ASR ({asr_engine}): {done}/{total} phần ({pct:.0f}%)"
+                )
+            else:
+                await ws_manager.broadcast_log(op_id, f"[Transcribe] Đang nhận dạng giọng nói ({asr_engine})...")
+
+    async def _on_log(message: str):
+        await ws_manager.broadcast_log(op_id, message)
+
     try:
         raw_result = await run_node_helper(
             action="transcribe-video",
-            data=data
+            data=data,
+            on_event=_on_event,
+            on_log=_on_log,
         )
 
         res_segments = []
@@ -231,14 +268,28 @@ async def api_transcribe_video(req_payload: Union[TranscribeRequest, Dict[str, A
             logger.warning(f"[Transcribe] Unexpected result shape from node_helper: {type(raw_result)}")
             res_segments = raw_result or []
 
+        await ws_manager.broadcast_log(op_id, f"[Transcribe] Hoàn tất nhận dạng: {len(res_segments)} câu phụ đề.")
+        await ws_manager.broadcast_op_progress(
+            op="transcribe",
+            op_id=op_id,
+            stage="done",
+            done=len(res_segments),
+            total=len(res_segments),
+            pct=100.0,
+            message=f"Hoàn tất: {len(res_segments)} câu"
+        )
+
     except NodeHelperCancelledError:
         logger.info(f"[Transcribe] Operation {op_id} was cancelled.")
+        await ws_manager.broadcast_log(op_id, "[Transcribe] Đã hủy nhận dạng theo yêu cầu.")
         raise HTTPException(
             status_code=499,
             detail="Transcription was cancelled.",
         )
     except NodeHelperError as e:
         logger.error(f"[Transcribe] NodeHelperError: {e.code} - {e.message}")
+        await ws_manager.broadcast_error(op_id, e.message)
+        await ws_manager.broadcast_log(op_id, f"[Transcribe] ✗ Lỗi nhận dạng: {e.message}")
         status_code = (
             status.HTTP_422_UNPROCESSABLE_ENTITY
             if e.code in ("FREE_EXPORT_DURATION_LIMIT", "TIMING_INFEASIBLE")
@@ -250,6 +301,8 @@ async def api_transcribe_video(req_payload: Union[TranscribeRequest, Dict[str, A
         )
     except Exception as e:
         logger.error(f"[Transcribe] Failed to transcribe via node_helper: {e}", exc_info=True)
+        await ws_manager.broadcast_error(op_id, str(e))
+        await ws_manager.broadcast_log(op_id, f"[Transcribe] ✗ Lỗi nhận dạng: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e),

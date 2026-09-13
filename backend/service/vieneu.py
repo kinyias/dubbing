@@ -16,6 +16,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 import numpy as np
 
+from core.ws_manager import ws_manager
 from service.setting import get_setting, load_transcript_settings
 
 logger = logging.getLogger("service_vieneu")
@@ -346,6 +347,31 @@ def generate_tts_batch_sync(
                             "sizeBytes": 0,
                             "error": str(save_err),
                         }
+
+                # Sau khi hoàn tất lưu file cho từng item trong chunk, phát tiến trình qua WebSocket
+                chunk_res_list = [results[idx] for idx in chunk_indices if results[idx] is not None]
+                chunk_ids_list = [str(r.get("id")) for r in chunk_res_list if r]
+                completed_so_far = sum(1 for r in results if r is not None)
+                total_items = len(items)
+                pct_val = round(completed_so_far / total_items * 100, 1) if total_items > 0 else 100.0
+
+                if op_id:
+                    try:
+                        ws_manager.broadcast_op_progress_sync(
+                            op="tts-batch",
+                            op_id=op_id,
+                            ids=chunk_ids_list,
+                            results=chunk_res_list,
+                            done=completed_so_far,
+                            total=total_items,
+                            pct=pct_val,
+                        )
+                        ws_manager.broadcast_log_sync(
+                            op_id,
+                            f"[TTS] Đã tạo giọng nói {completed_so_far}/{total_items} câu ({pct_val:.0f}%)"
+                        )
+                    except Exception as ws_err:
+                        logger.debug(f"[VieNeu] ws progress error: {ws_err}")
     finally:
         if op_id:
             cleanup_tts_op(op_id)

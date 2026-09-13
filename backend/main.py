@@ -45,6 +45,8 @@ from router.translate_segments import router as translate_router
 from router.tts_engines import router as tts_router
 from router.account import router as account_router
 
+from core.ws_manager import ws_manager
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -56,6 +58,12 @@ app = FastAPI(
     description="API Server nhận dạng giọng nói, dịch thuật và tổng hợp giọng nói VieNeu-TTS",
     version="1.0.0",
 )
+
+@app.on_event("startup")
+async def on_startup():
+    import asyncio
+    ws_manager.set_loop(asyncio.get_running_loop())
+    logger.info("Main FastAPI event loop registered with ws_manager.")
 
 # Cấu hình CORS để frontend hoặc curl gọi tự do
 app.add_middleware(

@@ -20,6 +20,7 @@ from core.node_bridge import (
     cancel_node_helper,
     run_node_helper,
 )
+from core.ws_manager import ws_manager
 from service.setting import load_transcript_settings
 
 logger = logging.getLogger("router_custom_transcript")
@@ -97,25 +98,76 @@ async def api_translate_segments(req_payload: Union[TranslateRequest, Dict[str, 
         data["polish"] = req.get("polish")
 
     op_id = req.get("opId")
+    segments_count = len(req.get("segments") or [])
     logger.info(
-        f"[Translate] Starting translate job opId={op_id}, provider='{req.get('provider')}', model='{req.get('model')}', count={len(req.get('segments') or [])}"
+        f"[Translate] Starting translate job opId={op_id}, provider='{req.get('provider')}', model='{req.get('model')}', count={segments_count}"
     )
+
+    if op_id:
+        await ws_manager.broadcast_log(op_id, f"[Translate] Bắt đầu dịch {segments_count} đoạn phụ đề...")
+        await ws_manager.broadcast_op_progress(
+            op="translate",
+            op_id=op_id,
+            done=0,
+            total=max(1, (segments_count + 9) // 10),
+            pct=0.0,
+            message=f"Bắt đầu dịch {segments_count} câu..."
+        )
+
+    async def _on_event(event: dict):
+        if not isinstance(event, dict):
+            return
+        if "opId" not in event and op_id:
+            event["opId"] = op_id
+        await ws_manager.broadcast_json(event)
+
+        if op_id and event.get("type") == "progress" and event.get("op") == "translate":
+            done = event.get("done")
+            total = event.get("total")
+            if done is not None and total is not None:
+                await ws_manager.broadcast_log(
+                    op_id, f"[Translate] Đang dịch: {done}/{total} cụm câu"
+                )
+
+    async def _on_log(message: str):
+        if op_id:
+            await ws_manager.broadcast_log(op_id, message)
 
     try:
         result = await run_node_helper(
             action="translate-segments",
             data=data,
             settings=settings,
+            on_event=_on_event,
+            on_log=_on_log,
         )
+
+        if op_id:
+            trans_count = len(result.get("translations", [])) if isinstance(result, dict) else segments_count
+            await ws_manager.broadcast_log(op_id, f"[Translate] Hoàn tất dịch {trans_count} đoạn phụ đề.")
+            await ws_manager.broadcast_op_progress(
+                op="translate",
+                op_id=op_id,
+                done=1,
+                total=1,
+                pct=100.0,
+                message=f"Hoàn tất: {trans_count} câu"
+            )
+
         return result
     except NodeHelperCancelledError:
         logger.info(f"[Translate] Operation {op_id} was cancelled.")
+        if op_id:
+            await ws_manager.broadcast_log(op_id, "[Translate] Đã hủy dịch theo yêu cầu.")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Translation was cancelled",
         )
     except NodeHelperError as e:
         logger.error(f"[Translate] NodeHelperError: {e.code} - {e.message}")
+        if op_id:
+            await ws_manager.broadcast_error(op_id, e.message)
+            await ws_manager.broadcast_log(op_id, f"[Translate] ✗ Lỗi dịch: {e.message}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e.message or e),
@@ -124,6 +176,9 @@ async def api_translate_segments(req_payload: Union[TranslateRequest, Dict[str, 
         raise
     except Exception as e:
         logger.error(f"[Translate] Failed to translate segments: {e}", exc_info=True)
+        if op_id:
+            await ws_manager.broadcast_error(op_id, str(e))
+            await ws_manager.broadcast_log(op_id, f"[Translate] ✗ Lỗi dịch: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e),

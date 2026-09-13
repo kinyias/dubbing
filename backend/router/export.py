@@ -22,6 +22,7 @@ from core.node_bridge import (
     cancel_node_helper,
     run_node_helper,
 )
+from core.ws_manager import ws_manager
 from service.setting import load_transcript_settings
 
 logger = logging.getLogger("router_custom_export")
@@ -293,13 +294,49 @@ async def api_export_video(req_payload: Union[ExportRequest, Dict[str, Any]]):
         f"output='{output_path}', segments={len(req.get('segments') or [])}"
     )
 
+    await ws_manager.broadcast_stage(op_id, "start")
+    await ws_manager.broadcast_log(op_id, "[Export] Đang chuẩn bị xuất video...")
+
+    async def _on_event(event: dict):
+        if not isinstance(event, dict):
+            return
+        if "opId" not in event:
+            event["opId"] = op_id
+
+        # Forward export progress to ws_manager
+        if event.get("type") == "progress" and event.get("op") == "export":
+            pct = float(event.get("pct") or 0.0)
+            out_time = float(event.get("outTime") or 0.0)
+            fps = str(event.get("fps") or "")
+            speed = str(event.get("speed") or "")
+            encoder = str(event.get("encoder") or "")
+            stage = str(event.get("stage") or "")
+            await ws_manager.broadcast_progress(
+                op_id=op_id,
+                pct=pct,
+                out_time=out_time,
+                fps=fps,
+                speed=speed,
+                encoder=encoder,
+                stage=stage,
+            )
+        else:
+            await ws_manager.broadcast_json(event)
+
+    async def _on_log(message: str):
+        await ws_manager.broadcast_log(op_id, message)
+
     try:
         res = await run_node_helper(
             action="export-video",
             data=data,
             settings=settings,
+            on_event=_on_event,
+            on_log=_on_log,
         )
         final_output = (res.get("outputFilePath") if isinstance(res, dict) else None) or output_path
+        await ws_manager.broadcast_finished(op_id, final_output)
+        await ws_manager.broadcast_log(op_id, f"[Export] ✓ Xuất video thành công: {final_output}")
         return {
             "success": True,
             "opId": op_id,
@@ -310,6 +347,7 @@ async def api_export_video(req_payload: Union[ExportRequest, Dict[str, Any]]):
     except NodeHelperCancelledError:
         logger.info(f"[Export] Operation {op_id} was cancelled by user.")
         _remove_partial_output(output_path)
+        await ws_manager.broadcast_log(op_id, "[Export] Đã hủy xuất video theo yêu cầu.")
         return {
             "success": False,
             "cancelled": True,
@@ -319,6 +357,8 @@ async def api_export_video(req_payload: Union[ExportRequest, Dict[str, Any]]):
     except NodeHelperError as e:
         logger.error(f"[Export] NodeHelperError: {e.code} - {e.message}")
         _remove_partial_output(output_path)
+        await ws_manager.broadcast_error(op_id, e.message)
+        await ws_manager.broadcast_log(op_id, f"[Export] ✗ Lỗi xuất video: {e.message}")
         status_code = _NODE_EXPORT_ERROR_STATUS.get(e.code, status.HTTP_500_INTERNAL_SERVER_ERROR)
         error_body = _export_error_body(e.code, e.message, getattr(e, "details", None))
         raise HTTPException(status_code=status_code, detail=error_body)
@@ -328,6 +368,8 @@ async def api_export_video(req_payload: Union[ExportRequest, Dict[str, Any]]):
     except Exception as e:
         logger.error(f"[Export] Export pipeline failed: {e}", exc_info=True)
         _remove_partial_output(output_path)
+        await ws_manager.broadcast_error(op_id, str(e))
+        await ws_manager.broadcast_log(op_id, f"[Export] ✗ Lỗi xuất video: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=_export_error_body("EXPORT_PIPELINE_FAILED", str(e)),
