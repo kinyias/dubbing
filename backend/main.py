@@ -36,6 +36,7 @@ import uvicorn
 from router.compute_time_plan import router as timing_router
 from router.export import router as export_router
 from router.pipeline import router as pipeline_router
+from router.settings import router as settings_router
 from router.transcribe_video import router as transcript_router
 from router.transcript import router as dialog_ws_router
 from router.translate_segments import router as translate_router
@@ -65,6 +66,7 @@ app.add_middleware(
 # Đăng ký các router từ transcribe_video.py, translate_segments.py, tts_engines.py, compute_time_plan.py, export.py, pipeline.py và streamfile.py
 app.include_router(transcript_router)
 app.include_router(dialog_ws_router)
+app.include_router(settings_router)
 app.include_router(translate_router)
 app.include_router(tts_router)
 app.include_router(timing_router)
