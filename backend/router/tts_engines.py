@@ -13,7 +13,7 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
 from core.ws_manager import ws_manager
-from service.vieneu import (
+from backend.service.vieneu_tts import (
     cancel_tts_op,
     generate_tts_batch_sync,
     list_preset_voices,

@@ -30,10 +30,46 @@ from service.download_hongguo import (
     get_download_base_dir,
     generate_video_filename,
 )
+from service.handle_video import (
+    ensure_homogeneous_videos,
+    concat_videos_stream_copy,
+    extract_and_concat_clean_audio,
+    execute_dubbing_pipeline_for_stream_copy,
+)
 
 logger = logging.getLogger("router_hongguo")
 
 router = APIRouter(prefix="/api/hongguo", tags=["hongguo"])
+
+# ---------------------------------------------------------------------------
+# Download Cancellation / Pause Management
+# ---------------------------------------------------------------------------
+_cancelled_download_ops: set[str] = set()
+_cancelled_ops_lock = threading.Lock()
+
+
+def cancel_hongguo_download(op_id: str) -> None:
+    """Đánh dấu op_id bị hủy/tạm dừng tải."""
+    if not op_id:
+        return
+    with _cancelled_ops_lock:
+        _cancelled_download_ops.add(op_id)
+
+
+def is_hongguo_download_cancelled(op_id: Optional[str]) -> bool:
+    """Kiểm tra xem tác vụ tải có đang bị yêu cầu dừng không."""
+    if not op_id:
+        return False
+    with _cancelled_ops_lock:
+        return op_id in _cancelled_download_ops
+
+
+def clear_cancelled_hongguo_op(op_id: str) -> None:
+    """Xóa op_id khỏi danh sách đã dừng khi bắt đầu lượt mới."""
+    if not op_id:
+        return
+    with _cancelled_ops_lock:
+        _cancelled_download_ops.discard(op_id)
 
 
 # ---------------------------------------------------------------------------
@@ -58,6 +94,34 @@ class BatchDownloadRequest(BaseModel):
     )
     max_workers: int = Field(3, ge=1, le=10, description="Số luồng tải đồng thời (mặc định 3, tối đa 10)")
     save_dir: Optional[str] = Field(None, description="Đường dẫn thư mục lưu file tùy chỉnh (tùy chọn)")
+
+
+class DubbingBatchRequest(BaseModel):
+    op_id: Optional[str] = Field(None, description="Operation ID để theo dõi qua WebSocket")
+    series_id: Optional[str] = Field(None, description="ID bộ phim (series_id)")
+    series_title: Optional[str] = Field(None, description="Tên phim dùng để đặt thư mục lưu (tùy chọn)")
+    items: Optional[List[DownloadItemRequest]] = Field(
+        None, description="Danh sách các tập cần tải & lồng tiếng"
+    )
+    episode_range: Optional[str] = Field(
+        None, description="Khoảng tập muốn tải nếu có series_id, ví dụ: '1-10', '1,3,5' hoặc 'all'"
+    )
+    max_workers: int = Field(3, ge=1, le=10, description="Số luồng tải đồng thời")
+    save_dir: Optional[str] = Field(None, description="Đường dẫn thư mục lưu file")
+
+    # Dubbing Pipeline settings
+    transcribe_engine: Optional[str] = Field("capcut", description="Engine phiên âm ASR (capcut, bcut, groq, auto)")
+    source_lang: Optional[str] = Field("auto", description="Ngôn ngữ nguồn (auto, zh, en...)")
+    target_lang: Optional[str] = Field("vi", description="Ngôn ngữ dịch thuật (vi...)")
+    preset: Optional[str] = Field("default", description="Preset dịch thuật LLM")
+    provider: Optional[str] = Field("custom", description="Nhà cung cấp dịch thuật (custom, deepseek, ezmax)")
+    model: Optional[str] = Field(None, description="Model LLM dịch thuật")
+    voice_id: Optional[str] = Field("Ngọc Huyền", description="Tên giọng đọc VieNeu (ví dụ: 'Ngọc Huyền')")
+    tts_speed: Optional[float] = Field(1.0, description="Tốc độ giọng đọc TTS")
+    voice_rate: Optional[float] = Field(1.0, description="Tỉ lệ tốc độ giọng đọc chung")
+    fit_mode: Optional[str] = Field("natural_flow", description="Chế độ khớp nhịp")
+    output_filename: Optional[str] = Field(None, description="Tên file video lồng tiếng xuất ra")
+
 
 
 # ---------------------------------------------------------------------------
@@ -213,6 +277,7 @@ async def batch_download_hongguo(
 
     # 3. Tối ưu trước: Batch resolve video models bằng 1 Liushen signature cho mỗi block 20 vids
     op_id = req.op_id or f"hg-download-{uuid.uuid4().hex[:8]}"
+    clear_cancelled_hongguo_op(op_id)
     total_tasks = len(download_tasks)
 
     num_workers = max(1, min(req.max_workers, 10))
@@ -246,15 +311,27 @@ async def batch_download_hongguo(
     completed_count = 0
     success_count = 0
     failed_count = 0
+    skipped_or_cancelled_count = 0
     progress_lock = threading.Lock()
 
     def _worker(task: Dict[str, Any]) -> Dict[str, Any]:
-        nonlocal completed_count, success_count, failed_count
+        nonlocal completed_count, success_count, failed_count, skipped_or_cancelled_count
         vid = task["vid"]
         ep = task.get("episode")
         fn = task.get("filename")
         sid = task.get("series_id")
         
+        if is_hongguo_download_cancelled(op_id):
+            with progress_lock:
+                skipped_or_cancelled_count += 1
+            return {
+                "vid": vid,
+                "episode": ep,
+                "success": False,
+                "error": "Tác vụ đã bị tạm dừng/hủy bỏ bởi người dùng",
+                "cancelled": True,
+            }
+
         ws_manager.broadcast_log_sync(
             op_id, f"[Hồng Quả] Đang tải tập {ep or vid}..."
         )
@@ -297,6 +374,16 @@ async def batch_download_hongguo(
                 )
             return item_result
         except Exception as err:
+            if is_hongguo_download_cancelled(op_id):
+                with progress_lock:
+                    skipped_or_cancelled_count += 1
+                return {
+                    "vid": vid,
+                    "episode": ep,
+                    "success": False,
+                    "error": "Tác vụ đã bị tạm dừng",
+                    "cancelled": True,
+                }
             logger.error(f"Tải thất bại vid={vid}, tập={ep}: {err}")
             item_result = {
                 "vid": vid,
@@ -328,28 +415,374 @@ async def batch_download_hongguo(
             None, lambda: list(executor.map(_worker, download_tasks))
         )
 
+    was_cancelled = is_hongguo_download_cancelled(op_id)
     success_items = [r for r in results if r.get("success")]
     failed_items = [r for r in results if not r.get("success")]
 
-    ws_manager.broadcast_op_progress_sync(
-        op="hongguo_download",
-        op_id=op_id,
-        done=total_tasks,
-        total=total_tasks,
-        pct=100.0,
-        stage="completed",
-        message=f"Hoàn thành tải {success_count}/{total_tasks} tập phim",
-        save_dir=target_save_dir,
-    )
+    if was_cancelled:
+        ws_manager.broadcast_op_progress_sync(
+            op="hongguo_download",
+            op_id=op_id,
+            done=completed_count,
+            total=total_tasks,
+            pct=round((completed_count / total_tasks) * 100, 1) if total_tasks else 0,
+            stage="paused",
+            message=f"Đã tạm dừng tải phim. Đã hoàn thành {success_count}/{total_tasks} tập.",
+            save_dir=target_save_dir,
+            cancelled=True,
+        )
+        ws_manager.broadcast_log_sync(
+            op_id, f"[Hồng Quả] Đã tạm dừng tải phim theo yêu cầu ({success_count}/{total_tasks} tập)."
+        )
+    else:
+        ws_manager.broadcast_op_progress_sync(
+            op="hongguo_download",
+            op_id=op_id,
+            done=total_tasks,
+            total=total_tasks,
+            pct=100.0,
+            stage="completed",
+            message=f"Hoàn thành tải {success_count}/{total_tasks} tập phim",
+            save_dir=target_save_dir,
+            cancelled=False,
+        )
 
     return {
-        "success": len(failed_items) == 0,
+        "success": len(failed_items) == 0 and not was_cancelled,
+        "cancelled": was_cancelled,
         "op_id": op_id,
         "total": len(download_tasks),
         "success_count": len(success_items),
         "failed_count": len(failed_items),
         "save_dir": target_save_dir,
         "results": results,
+    }
+
+
+@router.post("/dubbing")
+async def batch_download_and_dubbing_hongguo(
+    req: DubbingBatchRequest,
+    request: Request
+):
+    """
+    Tải hàng loạt video Hồng Quả và tự động thực hiện toàn bộ quy trình lồng tiếng:
+    1. Tải toàn bộ danh sách tập theo yêu cầu.
+    2. Quét kiểm tra định dạng các video tải về, tự động phát hiện GPU/CPU để render đồng bộ nếu có tập dị biệt.
+    3. Ghép nối tiếp video siêu tốc bằng Stream Copy.
+    4. Trích xuất & ghép audio chuẩn (48kHz Stereo) tránh giật tiếng.
+    5. Thực thi Pipeline Dubbing: Transcribe -> Translate -> VieNeu TTS -> Compute Timing Plan -> Mix TTS audio & Ducked/Muted Background Audio -> Ghép vào Video stream copy.
+    """
+    download_tasks: List[Dict[str, Any]] = []
+    series_id = req.series_id.strip() if req.series_id else None
+    series_title = req.series_title.strip() if req.series_title else ""
+
+    # Xác định thư mục lưu
+    target_save_dir = req.save_dir
+    if not target_save_dir:
+        base_dir = get_download_base_dir()
+        if series_id:
+            folder_name = f"{series_id}_{re.sub(r'[\\/*?:\"<>|]', '_', series_title)}" if series_title else series_id
+            target_save_dir = str(base_dir / folder_name)
+        else:
+            target_save_dir = str(base_dir)
+
+    os.makedirs(target_save_dir, exist_ok=True)
+    loop = asyncio.get_running_loop()
+
+    # 1. Danh sách tasks
+    if req.items:
+        for it in req.items:
+            vid = str(it.vid).strip()
+            if not vid:
+                continue
+            download_tasks.append({
+                "vid": vid,
+                "episode": it.episode,
+                "filename": it.filename,
+                "series_id": series_id,
+            })
+    elif series_id:
+        try:
+            meta, eps = await loop.run_in_executor(None, get_episodes, series_id, True)
+            total_eps = len(eps)
+            selected_indices = set(parse_range_indices(req.episode_range or "all", total_eps))
+            
+            for ep in eps:
+                if ep.get("index") in selected_indices and ep.get("vid"):
+                    download_tasks.append({
+                        "vid": ep["vid"],
+                        "episode": ep["index"],
+                        "filename": generate_video_filename(
+                            ep["vid"], series_id=series_id, episode=ep["index"]
+                        ),
+                        "series_id": series_id,
+                    })
+        except Exception as exc:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Lỗi truy vấn danh sách tập của series_id={series_id}: {str(exc)}"
+            )
+
+    if not download_tasks:
+        raise HTTPException(
+            status_code=400,
+            detail="Không có tập phim nào hợp lệ để tải & lồng tiếng."
+        )
+
+    op_id = req.op_id or f"hg-dubbing-{uuid.uuid4().hex[:8]}"
+    clear_cancelled_hongguo_op(op_id)
+    total_tasks = len(download_tasks)
+    num_workers = max(1, min(req.max_workers, 10))
+
+    ws_manager.broadcast_op_progress_sync(
+        op="hongguo_dubbing",
+        op_id=op_id,
+        done=0,
+        total=total_tasks,
+        pct=0.0,
+        stage="init",
+        message=f"Bắt đầu tải và lồng tiếng {total_tasks} tập phim...",
+    )
+    ws_manager.broadcast_log_sync(
+        op_id, f"[Hồng Quả Lồng Tiếng] Khởi tạo tác vụ lồng tiếng {total_tasks} tập..."
+    )
+
+    # 2. Batch resolve
+    all_vids = [t["vid"] for t in download_tasks]
+    try:
+        await loop.run_in_executor(
+            None, resolve_batch_video_models, all_vids, 20
+        )
+    except Exception as exc:
+        logger.warning(f"Batch resolve models cảnh báo: {exc}")
+
+    # 3. Tải các video
+    completed_count = 0
+    progress_lock = threading.Lock()
+
+    def _worker(task: Dict[str, Any]) -> Dict[str, Any]:
+        nonlocal completed_count
+        vid = task["vid"]
+        ep = task.get("episode")
+        fn = task.get("filename")
+        sid = task.get("series_id")
+
+        if is_hongguo_download_cancelled(op_id):
+            return {"vid": vid, "episode": ep, "success": False, "cancelled": True}
+
+        ws_manager.broadcast_log_sync(op_id, f"[Hồng Quả] Đang tải tập {ep or vid}...")
+        try:
+            res = handle_video_request(
+                video_id=vid,
+                request=request,
+                max_retries=3,
+                series_id=sid,
+                episode=ep,
+                filename=fn,
+                save_dir=target_save_dir,
+            )
+            local_path = None
+            if fn:
+                candidate = os.path.join(target_save_dir, fn)
+                if os.path.exists(candidate):
+                    local_path = candidate
+
+            with progress_lock:
+                completed_count += 1
+                pct = round((completed_count / total_tasks) * 30, 1) # Tải chiếm 30% pipeline
+                ws_manager.broadcast_op_progress_sync(
+                    op="hongguo_dubbing",
+                    op_id=op_id,
+                    done=completed_count,
+                    total=total_tasks,
+                    pct=pct,
+                    stage="downloading",
+                    message=f"Đã tải xong tập {ep or vid} ({completed_count}/{total_tasks})",
+                )
+                ws_manager.broadcast_log_sync(op_id, f"[Hồng Quả] ✓ Tải xong tập {ep or vid}")
+
+            return {
+                "vid": vid,
+                "episode": ep,
+                "success": True,
+                "local_path": local_path,
+                "file": res.get("url"),
+                "quality": res.get("quality"),
+            }
+        except Exception as err:
+            logger.error(f"Tải thất bại tập {ep or vid}: {err}")
+            return {"vid": vid, "episode": ep, "success": False, "error": str(err)}
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=num_workers) as executor:
+        dl_results = await loop.run_in_executor(
+            None, lambda: list(executor.map(_worker, download_tasks))
+        )
+
+    if is_hongguo_download_cancelled(op_id):
+        ws_manager.broadcast_op_progress_sync(
+            op="hongguo_dubbing",
+            op_id=op_id,
+            done=completed_count,
+            total=total_tasks,
+            pct=0.0,
+            stage="cancelled",
+            message="Tác vụ lồng tiếng đã bị hủy.",
+            cancelled=True,
+        )
+        return {"success": False, "cancelled": True, "op_id": op_id}
+
+    # Thu thập danh sách các file video đã tải về máy
+    downloaded_video_paths: List[str] = []
+    for r in dl_results:
+        lp = r.get("local_path")
+        if lp and os.path.exists(lp):
+            downloaded_video_paths.append(lp)
+
+    if not downloaded_video_paths or len(downloaded_video_paths) < len(download_tasks):
+        # Tìm các file mp4 theo filename đã định dạng
+        downloaded_video_paths = []
+        for t in download_tasks:
+            fn = t.get("filename") or f"{t['vid']}.mp4"
+            candidate = os.path.join(target_save_dir, fn)
+            if os.path.exists(candidate):
+                downloaded_video_paths.append(candidate)
+
+    if not downloaded_video_paths:
+        raise HTTPException(
+            status_code=500,
+            detail="Không tìm thấy tệp video nào đã tải về để tiến hành ghép và lồng tiếng."
+        )
+
+    # 4. Kiểm tra format & Đồng bộ hóa video
+    ws_manager.broadcast_op_progress_sync(
+        op="hongguo_dubbing",
+        op_id=op_id,
+        done=completed_count,
+        total=total_tasks,
+        pct=35.0,
+        stage="check_formats",
+        message="Đang kiểm tra đồng bộ định dạng video (GPU/CPU)...",
+    )
+    
+    temp_pipeline_dir = os.path.join(target_save_dir, f"dubbing_work_{op_id}")
+    os.makedirs(temp_pipeline_dir, exist_ok=True)
+
+    def _log_msg(msg: str):
+        ws_manager.broadcast_log_sync(op_id, msg)
+
+    normalized_video_paths = await loop.run_in_executor(
+        None,
+        lambda: ensure_homogeneous_videos(
+            video_paths=downloaded_video_paths,
+            temp_dir=temp_pipeline_dir,
+            log_callback=_log_msg,
+        )
+    )
+
+    # 5. Ghép Video Stream Copy & Nối Audio chuẩn
+    ws_manager.broadcast_op_progress_sync(
+        op="hongguo_dubbing",
+        op_id=op_id,
+        done=completed_count,
+        total=total_tasks,
+        pct=45.0,
+        stage="stream_copy_concat",
+        message="Đang thực hiện ghép video stream copy và nối audio chuẩn...",
+    )
+    ws_manager.broadcast_log_sync(op_id, "[Hồng Quả] Ghép video nối tiếp stream copy và trích xuất audio chuẩn...")
+
+    concat_stream_copy_video = os.path.join(temp_pipeline_dir, f"concat_stream_copy_{op_id}.mp4")
+    clean_audio_path = os.path.join(temp_pipeline_dir, f"clean_audio_{op_id}.m4a")
+
+    await loop.run_in_executor(
+        None,
+        lambda: concat_videos_stream_copy(
+            video_paths=normalized_video_paths,
+            output_path=concat_stream_copy_video,
+        )
+    )
+
+    await loop.run_in_executor(
+        None,
+        lambda: extract_and_concat_clean_audio(
+            video_paths=normalized_video_paths,
+            output_audio_path=clean_audio_path,
+            target_sample_rate=48000,
+        )
+    )
+
+    # 6. Pipeline Lồng tiếng: Transcribe -> Translate -> TTS -> Timing -> Mix & Mux
+    out_name = req.output_filename
+    if not out_name:
+        s_title_clean = re.sub(r'[\\/*?:\"<>|]', '_', series_title) if series_title else "hongguo"
+        out_name = f"{series_id or 'drama'}_{s_title_clean}_dubbed.mp4"
+
+    if not out_name.lower().endswith(".mp4"):
+        out_name += ".mp4"
+
+    final_dubbed_output = os.path.join(target_save_dir, out_name)
+
+    def _progress_cb(stage: str, sub_pct: int, msg: str):
+        # Ánh xạ tiến độ pipeline dubbing từ 50% đến 100%
+        overall_pct = round(45.0 + (sub_pct * 0.55), 1)
+        ws_manager.broadcast_op_progress_sync(
+            op="hongguo_dubbing",
+            op_id=op_id,
+            done=total_tasks,
+            total=total_tasks,
+            pct=overall_pct,
+            stage=stage,
+            message=msg,
+        )
+
+    dubbing_res = await execute_dubbing_pipeline_for_stream_copy(
+        stream_copy_video_path=concat_stream_copy_video,
+        original_audio_path=clean_audio_path,
+        output_dubbed_video_path=final_dubbed_output,
+        op_id=op_id,
+        transcribe_engine=req.transcribe_engine or "capcut",
+        source_lang=req.source_lang or "auto",
+        target_lang=req.target_lang or "vi",
+        preset=req.preset or "default",
+        provider=req.provider or "custom",
+        model=req.model,
+        voice_id=req.voice_id or "Ngọc Huyền",
+        tts_speed=req.tts_speed or 1.0,
+        voice_rate=req.voice_rate or 1.0,
+        fit_mode=req.fit_mode or "natural_flow",
+        temp_dir=temp_pipeline_dir,
+        log_callback=_log_msg,
+        progress_callback=_progress_cb,
+    )
+
+    out_size = os.path.getsize(final_dubbed_output) if os.path.exists(final_dubbed_output) else 0
+
+    ws_manager.broadcast_op_progress_sync(
+        op="hongguo_dubbing",
+        op_id=op_id,
+        done=total_tasks,
+        total=total_tasks,
+        pct=100.0,
+        stage="completed",
+        message=f"Hoàn thành xuất sắc video lồng tiếng: {os.path.basename(final_dubbed_output)}",
+        save_dir=target_save_dir,
+        output_file=final_dubbed_output,
+    )
+    ws_manager.broadcast_log_sync(
+        op_id, f"[Hồng Quả] ✓ Đã hoàn thành toàn bộ quá trình tải và lồng tiếng! File: {final_dubbed_output}"
+    )
+
+    return {
+        "success": True,
+        "op_id": op_id,
+        "series_id": series_id,
+        "total_episodes": len(download_tasks),
+        "save_dir": target_save_dir,
+        "stream_copy_video": concat_stream_copy_video,
+        "output_file": final_dubbed_output,
+        "output_size_bytes": out_size,
+        "segments_count": dubbing_res.get("segmentsCount", 0),
+        "duration": dubbing_res.get("duration", 0.0),
     }
 
 
@@ -428,6 +861,26 @@ async def download_single_video(
             current_op_id, f"[Hồng Quả] ✗ Lỗi tải tập {episode or vid_clean}: {str(exc)}"
         )
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.post("/cancel-download")
+async def cancel_batch_download(body: Dict[str, Any]):
+    """Tạm dừng/hủy bỏ tác vụ tải phim Hồng Quả theo op_id."""
+    op_id = body.get("op_id") or body.get("opId")
+    if not op_id:
+        raise HTTPException(status_code=400, detail="op_id không được để trống")
+
+    cancel_hongguo_download(str(op_id))
+    logger.info(f"Đã kích hoạt dừng download cho op_id={op_id}")
+    ws_manager.broadcast_log_sync(
+        str(op_id), f"[Hồng Quả] Đang dừng các luồng tải..."
+    )
+    return {
+        "success": True,
+        "op_id": str(op_id),
+        "status": "cancelled",
+        "message": "Đã gửi tín hiệu dừng tải"
+    }
 
 
 @router.get("/get-download-dir")

@@ -41,7 +41,7 @@ from router.export import (
     canon_path,
 )
 from service.setting import load_transcript_settings
-from service.vieneu import (
+from backend.service.vieneu_tts import (
     cancel_tts_op,
     generate_tts_batch_sync,
     is_tts_cancelled,

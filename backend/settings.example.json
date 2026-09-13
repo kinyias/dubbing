@@ -10,7 +10,7 @@
     "ttsReadFullTranslation": false,
     "ttsSpokenPolicyV2": true,
     "ttsVerifyDefaultOffV1": true,
-    "ttsFitMode": "natural_flow",
+    "ttsFitMode": "speed_up_tts",
     "ttsGlobalVoiceRate": "auto",
     "videoVolume": 0.2,
     "ttsVolume": 2.5,
@@ -39,7 +39,7 @@
         "vieneu": {
             "style": "tu_nhien",
             "profile": "auto",
-            "maxBatchSize": 8,
+            "maxBatchSize": 128,
             "threads": 0,
             "engine": "vieneu",
             "gpuSlot": "on"

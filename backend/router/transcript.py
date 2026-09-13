@@ -242,7 +242,7 @@ async def get_transcript_voices(refresh: bool = False):
     # 3. Gộp giọng VieNeu presets (nếu có module VieNeu)
     try:
         import dataclasses
-        from service.vieneu import list_preset_voices as vieneu_registry
+        from backend.service.vieneu_tts import list_preset_voices as vieneu_registry
         vieneu_presets = vieneu_registry() or []
         for vp in vieneu_presets:
             if isinstance(vp, dict):

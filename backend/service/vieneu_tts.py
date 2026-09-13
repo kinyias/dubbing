@@ -366,6 +366,17 @@ def generate_tts_batch_sync(
                             total=total_items,
                             pct=pct_val,
                         )
+                        # Phát event tiến độ dubbing nếu op_id là tác vụ hongguo dubbing
+                        ws_manager.broadcast_json_sync({
+                            "type": "progress",
+                            "op": "hongguo_dubbing",
+                            "opId": op_id,
+                            "stage": "tts",
+                            "done": completed_so_far,
+                            "total": total_items,
+                            "pct": round(55.0 + (completed_so_far / total_items * 20.0), 1) if total_items > 0 else 75.0,
+                            "message": f"Đang tạo TTS: {completed_so_far}/{total_items} câu ({pct_val:.0f}%)",
+                        })
                         ws_manager.broadcast_log_sync(
                             op_id,
                             f"[TTS] Đã tạo giọng nói {completed_so_far}/{total_items} câu ({pct_val:.0f}%)"

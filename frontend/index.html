@@ -7436,7 +7436,14 @@
                       </div>
                     </div>
 
-                    <div style="display: flex; gap: 8px">
+                    <div
+                      style="
+                        display: flex;
+                        gap: 8px;
+                        align-items: center;
+                        flex-wrap: wrap;
+                      "
+                    >
                       <button
                         type="button"
                         id="hg-download-range-btn"
@@ -7454,8 +7461,56 @@
                           style="font-size: 18px"
                           >download</span
                         >
-                        Tải các tập đã chọn
+                        <span>Tải các tập đã chọn</span>
                       </button>
+
+                      <button
+                        type="button"
+                        id="hg-dubbing-btn"
+                        class="btn btn--accent"
+                        style="
+                          padding: 8px 16px;
+                          font-weight: 600;
+                          display: flex;
+                          align-items: center;
+                          gap: 6px;
+                          background: linear-gradient(135deg, #6366f1, #a855f7);
+                          color: #fff;
+                          border: none;
+                        "
+                        title="Tải, ghép stream copy video & lồng tiếng tự động"
+                      >
+                        <span
+                          class="material-symbols-rounded"
+                          style="font-size: 18px"
+                          >record_voice_over</span
+                        >
+                        <span>Lồng tiếng (Dubbing)</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        id="hg-pause-resume-btn"
+                        class="btn"
+                        style="
+                          display: none;
+                          padding: 8px 16px;
+                          font-weight: 600;
+                          align-items: center;
+                          gap: 6px;
+                          background: #eab308;
+                          color: #000;
+                        "
+                      >
+                        <span
+                          class="material-symbols-rounded"
+                          id="hg-pause-resume-icon"
+                          style="font-size: 18px"
+                          >pause</span
+                        >
+                        <span id="hg-pause-resume-text">Tạm dừng</span>
+                      </button>
+
                       <button
                         type="button"
                         id="hg-download-all-btn"
@@ -7470,6 +7525,151 @@
                       >
                         Tải tất cả
                       </button>
+                    </div>
+                  </div>
+
+                  <!-- Tùy chọn Lồng Tiếng (Dubbing Settings) -->
+                  <div
+                    id="hg-dubbing-settings-box"
+                    style="
+                      margin-top: 12px;
+                      padding: 12px 14px;
+                      background: rgba(99, 102, 241, 0.06);
+                      border: 1px dashed rgba(99, 102, 241, 0.35);
+                      border-radius: 8px;
+                      display: flex;
+                      align-items: center;
+                      gap: 16px;
+                      flex-wrap: wrap;
+                      font-size: 13px;
+                    "
+                  >
+                    <div
+                      style="
+                        display: flex;
+                        align-items: center;
+                        gap: 6px;
+                        font-weight: 600;
+                        color: var(--accent);
+                      "
+                    >
+                      <span
+                        class="material-symbols-rounded"
+                        style="font-size: 18px"
+                        >tune</span
+                      >
+                      <span>Cài đặt Lồng tiếng:</span>
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: 6px">
+                      <span style="color: var(--muted)"
+                        >Giọng đọc (VieNeu):</span
+                      >
+                      <select
+                        id="hg-dub-voice-select"
+                        style="
+                          padding: 4px 8px;
+                          background: var(--panel);
+                          border: 1px solid var(--border);
+                          border-radius: 6px;
+                          color: var(--ink);
+                          font-size: 12px;
+                        "
+                      >
+                        <option value="Ngọc Huyền" selected>
+                          Ngọc Huyền (Nữ miền Bắc)
+                        </option>
+                        <option value="Bảo Quốc">
+                          Bảo Quốc (Nam miền Nam)
+                        </option>
+                        <option value="Mai Phương">
+                          Mai Phương (Nữ miền Nam)
+                        </option>
+                        <option value="Minh Quang">
+                          Minh Quang (Nam miền Bắc)
+                        </option>
+                        <option value="Thanh Hà">
+                          Thanh Hà (Nữ miền Trung)
+                        </option>
+                        <option value="Tuấn Anh">
+                          Tuấn Anh (Nam miền Trung)
+                        </option>
+                      </select>
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: 6px">
+                      <span style="color: var(--muted)">Tốc độ đọc:</span>
+                      <select
+                        id="hg-dub-speed-select"
+                        style="
+                          padding: 4px 8px;
+                          background: var(--panel);
+                          border: 1px solid var(--border);
+                          border-radius: 6px;
+                          color: var(--ink);
+                          font-size: 12px;
+                        "
+                      >
+                        <option value="0.9">0.9x</option>
+                        <option value="1.0" selected>1.0x (Chuẩn)</option>
+                        <option value="1.05">1.05x</option>
+                        <option value="1.1">1.1x (Nhanh vừa)</option>
+                        <option value="1.15">1.15x</option>
+                        <option value="1.2">1.2x</option>
+                      </select>
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: 6px">
+                      <span style="color: var(--muted)">ASR Engine:</span>
+                      <select
+                        id="hg-dub-asr-select"
+                        style="
+                          padding: 4px 8px;
+                          background: var(--panel);
+                          border: 1px solid var(--border);
+                          border-radius: 6px;
+                          color: var(--ink);
+                          font-size: 12px;
+                        "
+                      >
+                        <option value="capcut" selected>
+                          CapCut ASR (Khuyên dùng)
+                        </option>
+                        <option value="bcut">BCut ASR</option>
+                        <option value="groq">Groq Whisper</option>
+                      </select>
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: 6px">
+                      <span style="color: var(--muted)">Dịch thuật:</span>
+                      <select
+                        id="hg-dub-provider-select"
+                        style="
+                          padding: 4px 8px;
+                          background: var(--panel);
+                          border: 1px solid var(--border);
+                          border-radius: 6px;
+                          color: var(--ink);
+                          font-size: 12px;
+                        "
+                      >
+                        <option value="custom" selected>
+                          Custom AI (Gemini / Claude)
+                        </option>
+                        <option value="deepseek">DeepSeek AI</option>
+                      </select>
+                    </div>
+
+                    <div
+                      style="
+                        font-size: 12px;
+                        color: var(--muted);
+                        margin-left: auto;
+                      "
+                    >
+                      ✨ Tự động nhận diện GPU/CPU để render đồng bộ & Stream
+                      Copy video. Âm lượng gốc tự động giảm 0.1 & ngắt âm 0.1s
+                      mỗi 0.9s.
                     </div>
                   </div>
                 </div>
@@ -9543,6 +9743,81 @@
         let currentSeriesData = null;
         let selectedVids = new Set();
         let isDownloading = false;
+        let isPaused = false;
+        let currentOpId = null;
+        let downloadedVidSet = new Set();
+
+        function setDownloadUIState(state) {
+          // state: 'idle' | 'downloading' | 'paused'
+          const downloadBtn = document.getElementById('hg-download-range-btn');
+          const pauseResumeBtn = document.getElementById('hg-pause-resume-btn');
+          const pauseResumeIcon = document.getElementById(
+            'hg-pause-resume-icon',
+          );
+          const pauseResumeText = document.getElementById(
+            'hg-pause-resume-text',
+          );
+          const downloadAllBtn = document.getElementById('hg-download-all-btn');
+
+          if (state === 'downloading') {
+            isDownloading = true;
+            isPaused = false;
+            if (downloadBtn) downloadBtn.style.display = 'none';
+            if (pauseResumeBtn) {
+              pauseResumeBtn.style.display = 'inline-flex';
+              pauseResumeBtn.style.background = '#eab308';
+              pauseResumeBtn.style.color = '#000';
+              if (pauseResumeIcon) pauseResumeIcon.textContent = 'pause';
+              if (pauseResumeText) pauseResumeText.textContent = 'Tạm dừng';
+            }
+            if (downloadAllBtn) {
+              downloadAllBtn.disabled = true;
+              downloadAllBtn.style.opacity = '0.4';
+              downloadAllBtn.style.pointerEvents = 'none';
+              downloadAllBtn.style.cursor = 'not-allowed';
+            }
+          } else if (state === 'paused') {
+            isDownloading = false;
+            isPaused = true;
+            if (downloadBtn) downloadBtn.style.display = 'none';
+            if (pauseResumeBtn) {
+              pauseResumeBtn.style.display = 'inline-flex';
+              pauseResumeBtn.style.background = '#22c55e';
+              pauseResumeBtn.style.color = '#fff';
+              if (pauseResumeIcon) pauseResumeIcon.textContent = 'play_arrow';
+              if (pauseResumeText) pauseResumeText.textContent = 'Tiếp tục';
+            }
+            if (downloadAllBtn) {
+              downloadAllBtn.disabled = true;
+              downloadAllBtn.style.opacity = '0.4';
+              downloadAllBtn.style.pointerEvents = 'none';
+              downloadAllBtn.style.cursor = 'not-allowed';
+            }
+          } else {
+            // 'idle'
+            isDownloading = false;
+            isPaused = false;
+            if (downloadBtn) {
+              downloadBtn.style.display = 'inline-flex';
+              downloadBtn.disabled = false;
+            }
+            if (pauseResumeBtn) {
+              pauseResumeBtn.style.display = 'none';
+            }
+            if (downloadAllBtn) {
+              downloadAllBtn.disabled = false;
+              downloadAllBtn.style.opacity = '1';
+              downloadAllBtn.style.pointerEvents = 'auto';
+              downloadAllBtn.style.cursor = 'pointer';
+            }
+          }
+        }
+
+        function resetHongGuoUI() {
+          currentOpId = null;
+          downloadedVidSet.clear();
+          setDownloadUIState('idle');
+        }
 
         function formatDuration(sec) {
           if (!sec) return '00:00';
@@ -9585,6 +9860,7 @@
           if (progressPanel) progressPanel.style.display = 'none';
 
           try {
+            resetHongGuoUI();
             const res = await fetch(
               `/api/hongguo/detail?series_id=${encodeURIComponent(sid)}&no_cache=${noCache}`,
             );
@@ -9797,19 +10073,34 @@
                 data.message || 'Đang chuẩn bị danh sách tập phim...';
             } else if (data.stage === 'downloading' && progressTitle) {
               progressTitle.textContent = `Đang tải phim: ${data.done}/${data.total} tập (${data.pct}%)`;
+            } else if (data.stage === 'paused' && progressTitle) {
+              progressTitle.textContent = 'Đã tạm dừng tải phim';
+              setDownloadUIState('paused');
             } else if (data.stage === 'completed' && progressTitle) {
               progressTitle.textContent = 'Hoàn tất quá trình tải video!';
               if (progressFill) progressFill.style.width = '100%';
+              setDownloadUIState('idle');
             }
 
             if (data.last_result) {
               const res = data.last_result;
+              if (res.success && res.vid) {
+                downloadedVidSet.add(res.vid);
+              }
               const statusEl = document.getElementById(`hg-status-${res.vid}`);
               if (statusEl) {
-                statusEl.textContent = res.success ? 'Đã tải xong' : 'Lỗi';
-                statusEl.style.color = res.success ? '#22c55e' : '#ef4444';
+                statusEl.textContent = res.success
+                  ? 'Đã tải xong'
+                  : res.cancelled
+                    ? 'Đã tạm dừng'
+                    : 'Lỗi';
+                statusEl.style.color = res.success
+                  ? '#22c55e'
+                  : res.cancelled
+                    ? '#eab308'
+                    : '#ef4444';
               }
-              if (progressDetails) {
+              if (progressDetails && !res.cancelled) {
                 const itemDiv = document.createElement('div');
                 itemDiv.style.color = res.success ? '#22c55e' : '#ef4444';
                 itemDiv.textContent = res.success
@@ -9826,6 +10117,40 @@
               progressTitle.textContent = data.message;
             if (data.stage === 'completed' && progressFill)
               progressFill.style.width = '100%';
+          } else if (data.op === 'hongguo_dubbing') {
+            if (progressPanel) progressPanel.style.display = 'block';
+            if (data.pct !== undefined && progressFill) {
+              progressFill.style.width = `${data.pct}%`;
+            }
+            if (
+              data.done !== undefined &&
+              data.total !== undefined &&
+              progressStats
+            ) {
+              const unit =
+                data.stage === 'tts' || data.stage === 'translate'
+                  ? 'câu'
+                  : 'tập';
+              progressStats.textContent = `${data.done} / ${data.total} ${unit} (${data.pct || 0}%)`;
+            }
+            if (data.message && progressTitle) {
+              progressTitle.textContent = data.message;
+            }
+            if (progressDetails && data.message) {
+              const itemDiv = document.createElement('div');
+              itemDiv.style.color =
+                data.stage === 'completed'
+                  ? '#22c55e'
+                  : data.stage === 'error'
+                    ? '#ef4444'
+                    : 'var(--accent)';
+              itemDiv.textContent = `[${data.stage || 'dubbing'}] ${data.message}`;
+              progressDetails.prepend(itemDiv);
+            }
+            if (data.stage === 'completed') {
+              if (progressFill) progressFill.style.width = '100%';
+              setDownloadUIState('idle');
+            }
           }
         }
 
@@ -9865,7 +10190,7 @@
           }
         }
 
-        async function startBatchDownload(isAll = false) {
+        async function startBatchDownload(isAll = false, resumeOnly = false) {
           if (!currentSeriesData) {
             alert('Chưa có thông tin phim');
             return;
@@ -9896,6 +10221,8 @@
           );
 
           const opId = `hg-batch-${Date.now()}`;
+          currentOpId = opId;
+
           let payload = {
             op_id: opId,
             series_id: currentSeriesData.series_id,
@@ -9906,37 +10233,54 @@
             payload.save_dir = saveDir;
           }
 
+          // Chuẩn bị danh sách items cần tải (loại bỏ những tập đã tải thành công nếu đang tiếp tục)
+          let candidateItems = [];
           if (isAll) {
-            payload.episode_range = 'all';
+            (currentSeriesData.episodes || []).forEach((ep) => {
+              candidateItems.push({
+                vid: ep.vid,
+                episode: ep.index,
+                filename: `${currentSeriesData.series_id}_tap_${ep.index}.mp4`,
+              });
+            });
           } else if (rangeInput && rangeInput.toLowerCase() !== 'all') {
             payload.episode_range = rangeInput;
           } else {
-            // Lọc theo các checkbox đã tick
-            const items = [];
             (currentSeriesData.episodes || []).forEach((ep) => {
               if (selectedVids.has(ep.vid)) {
-                items.push({
+                candidateItems.push({
                   vid: ep.vid,
                   episode: ep.index,
                   filename: `${currentSeriesData.series_id}_tap_${ep.index}.mp4`,
                 });
               }
             });
-            if (items.length === 0) {
-              alert('Vui lòng chọn ít nhất 1 tập phim để tải');
-              return;
-            }
-            payload.items = items;
           }
 
-          isDownloading = true;
+          if (candidateItems.length > 0) {
+            // Lọc bỏ những tập đã tải xong
+            const remainingItems = candidateItems.filter(
+              (item) => !downloadedVidSet.has(item.vid),
+            );
+            if (remainingItems.length === 0) {
+              alert('Tất cả các tập đã chọn đều đã được tải hoàn tất!');
+              setDownloadUIState('idle');
+              return;
+            }
+            payload.items = remainingItems;
+            delete payload.episode_range;
+          } else if (!payload.episode_range) {
+            alert('Vui lòng chọn ít nhất 1 tập phim để tải');
+            return;
+          }
+
+          setDownloadUIState('downloading');
           if (progressPanel) progressPanel.style.display = 'block';
           if (progressTitle)
             progressTitle.textContent = `Đang tải video với ${workers} luồng...`;
-          if (progressStats)
+          if (progressStats && !resumeOnly)
             progressStats.textContent = 'Đang khởi tạo & giải mã...';
-          if (progressFill) progressFill.style.width = '0%';
-          if (progressDetails)
+          if (progressDetails && !resumeOnly)
             progressDetails.innerHTML =
               '<div>Khởi động tiến trình giải mã & tải song song...</div>';
 
@@ -9951,21 +10295,181 @@
               throw new Error(json.detail || 'Lỗi xử lý batch');
             }
 
-            if (progressFill) progressFill.style.width = '100%';
-            if (progressStats)
-              progressStats.textContent = `Thành công: ${json.success_count}/${json.total}`;
-            if (progressTitle)
-              progressTitle.textContent = 'Hoàn tất quá trình tải video!';
-
-            alert(
-              `Tải hoàn tất!\nThành công: ${json.success_count}/${json.total}\nThư mục: ${json.save_dir}`,
-            );
+            if (json.cancelled) {
+              setDownloadUIState('paused');
+            } else {
+              setDownloadUIState('idle');
+              if (progressFill) progressFill.style.width = '100%';
+              if (progressStats)
+                progressStats.textContent = `Thành công: ${json.success_count}/${json.total}`;
+              if (progressTitle)
+                progressTitle.textContent = 'Hoàn tất quá trình tải video!';
+              alert(
+                `Tải hoàn tất!\nThành công: ${json.success_count}/${json.total}\nThư mục: ${json.save_dir}`,
+              );
+            }
           } catch (err) {
+            if (isPaused) {
+              setDownloadUIState('paused');
+            } else {
+              setDownloadUIState('idle');
+              if (progressTitle)
+                progressTitle.textContent = 'Quá trình tải gặp lỗi';
+              alert('Lỗi tải hàng loạt: ' + err.message);
+            }
+          }
+        }
+
+        async function startBatchDubbing() {
+          if (!currentSeriesData) {
+            alert('Chưa có thông tin phim');
+            return;
+          }
+          if (isDownloading) {
+            alert('Đang có tiến trình xử lý, vui lòng chờ...');
+            return;
+          }
+
+          initHongGuoWebSocket();
+
+          const workers = parseInt(
+            document.getElementById('hg-workers-select')?.value || '3',
+            10,
+          );
+          const rangeInput = document
+            .getElementById('hg-range-input')
+            ?.value.trim();
+          const saveDir = (
+            document.getElementById('hg-savedir-input')?.value || ''
+          ).trim();
+
+          const voiceId =
+            document.getElementById('hg-dub-voice-select')?.value ||
+            'Ngọc Huyền';
+          const ttsSpeed = parseFloat(
+            document.getElementById('hg-dub-speed-select')?.value || '1.0',
+          );
+          const asrEngine =
+            document.getElementById('hg-dub-asr-select')?.value || 'capcut';
+          const provider =
+            document.getElementById('hg-dub-provider-select')?.value ||
+            'custom';
+
+          const progressPanel = document.getElementById('hg-progress-panel');
+          const progressTitle = document.getElementById('hg-progress-title');
+          const progressStats = document.getElementById('hg-progress-stats');
+          const progressFill = document.getElementById('hg-progress-fill');
+          const progressDetails = document.getElementById(
+            'hg-progress-details',
+          );
+
+          const opId = `hg-dubbing-${Date.now()}`;
+          currentOpId = opId;
+
+          let payload = {
+            op_id: opId,
+            series_id: currentSeriesData.series_id,
+            series_title: currentSeriesData.title,
+            max_workers: workers,
+            voice_id: voiceId,
+            tts_speed: ttsSpeed,
+            transcribe_engine: asrEngine,
+            provider: provider,
+          };
+          if (saveDir) {
+            payload.save_dir = saveDir;
+          }
+
+          let candidateItems = [];
+          if (rangeInput && rangeInput.toLowerCase() !== 'all') {
+            payload.episode_range = rangeInput;
+          } else {
+            (currentSeriesData.episodes || []).forEach((ep) => {
+              if (selectedVids.has(ep.vid)) {
+                candidateItems.push({
+                  vid: ep.vid,
+                  episode: ep.index,
+                  filename: `${currentSeriesData.series_id}_tap_${ep.index}.mp4`,
+                });
+              }
+            });
+            if (candidateItems.length > 0) {
+              payload.items = candidateItems;
+              delete payload.episode_range;
+            } else {
+              alert('Vui lòng chọn ít nhất 1 tập phim để lồng tiếng');
+              return;
+            }
+          }
+
+          setDownloadUIState('downloading');
+          if (progressPanel) progressPanel.style.display = 'block';
+          if (progressFill) progressFill.style.width = '0%';
+          if (progressTitle)
+            progressTitle.textContent =
+              'Khởi động quy trình Lồng tiếng tự động...';
+          if (progressStats) progressStats.textContent = 'Bắt đầu...';
+          if (progressDetails)
+            progressDetails.innerHTML =
+              '<div>[Khởi tạo] Chuẩn bị tải video, kiểm tra GPU/CPU, ghép stream copy và lồng tiếng...</div>';
+
+          try {
+            const res = await fetch('/api/hongguo/dubbing', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+            });
+            const json = await res.json();
+            if (!res.ok) {
+              throw new Error(json.detail || 'Lỗi xử lý lồng tiếng');
+            }
+
+            if (json.cancelled) {
+              setDownloadUIState('paused');
+            } else {
+              setDownloadUIState('idle');
+              if (progressFill) progressFill.style.width = '100%';
+              if (progressTitle)
+                progressTitle.textContent =
+                  'Hoàn tất xuất sắc video lồng tiếng!';
+              alert(
+                `Lồng tiếng hoàn tất xuất sắc!\n• Tổng số tập: ${json.total_episodes}\n• Số câu dịch: ${json.segments_count}\n• File xuất: ${json.output_file}`,
+              );
+            }
+          } catch (err) {
+            setDownloadUIState('idle');
             if (progressTitle)
-              progressTitle.textContent = 'Quá trình tải gặp lỗi';
-            alert('Lỗi tải hàng loạt: ' + err.message);
-          } finally {
-            isDownloading = false;
+              progressTitle.textContent = 'Quá trình lồng tiếng gặp lỗi';
+            alert('Lỗi lồng tiếng Hồng Quả: ' + err.message);
+          }
+        }
+
+        async function pauseBatchDownload() {
+          if (!currentOpId) {
+            setDownloadUIState('paused');
+            return;
+          }
+          try {
+            setDownloadUIState('paused');
+            const progressTitle = document.getElementById('hg-progress-title');
+            if (progressTitle)
+              progressTitle.textContent = 'Đang gửi tín hiệu dừng tải...';
+
+            await fetch('/api/hongguo/cancel-download', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ op_id: currentOpId }),
+            });
+          } catch (err) {
+            console.error('Lỗi khi dừng tải:', err);
+          }
+        }
+
+        async function handlePauseResumeClick() {
+          if (isDownloading) {
+            await pauseBatchDownload();
+          } else if (isPaused) {
+            await startBatchDownload(false, true);
           }
         }
 
@@ -10057,6 +10561,12 @@
           document
             .getElementById('hg-download-range-btn')
             ?.addEventListener('click', () => startBatchDownload(false));
+          document
+            .getElementById('hg-dubbing-btn')
+            ?.addEventListener('click', startBatchDubbing);
+          document
+            .getElementById('hg-pause-resume-btn')
+            ?.addEventListener('click', handlePauseResumeClick);
           document
             .getElementById('hg-download-all-btn')
             ?.addEventListener('click', () => startBatchDownload(true));
