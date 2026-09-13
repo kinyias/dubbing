@@ -12,7 +12,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
-# Nạp router xử lý phiên âm, dịch thuật và TTS
+# Nạp router xử lý phiên âm, dịch thuật, TTS và tính toán timing plan
+from router.compute_time_plan import router as timing_router
 from router.transcribe_video import router as transcript_router
 from router.translate_segments import router as translate_router
 from router.tts_engines import router as tts_router
@@ -45,17 +46,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Đăng ký các router từ transcribe_video.py, translate_segments.py và tts_engines.py
+# Đăng ký các router từ transcribe_video.py, translate_segments.py, tts_engines.py và compute_time_plan.py
 app.include_router(transcript_router)
 app.include_router(translate_router)
 app.include_router(tts_router)
+app.include_router(timing_router)
 
 
 @app.get("/")
 async def health_check():
     return {
         "status": "online",
-        "message": "Transcription, Translation & TTS API is running.",
+        "message": "Transcription, Translation, TTS & Timing Plan API is running.",
         "endpoints": [
             "/api/transcript/transcribe-video",
             "/api/transcript/cancel-transcribe",
@@ -66,6 +68,8 @@ async def health_check():
             "/api/transcript/cancel-tts-batch",
             "/api/transcript/generate-tts",
             "/api/transcript/vieneu-voices",
+            "/api/transcript/compute-timing-plan",
+            "/api/transcript/verify-dubbing-fit",
         ],
     }
 
