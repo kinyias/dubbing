@@ -120,6 +120,7 @@ class DubbingBatchRequest(BaseModel):
     tts_speed: Optional[float] = Field(1.0, description="Tốc độ giọng đọc TTS")
     voice_rate: Optional[float] = Field(1.0, description="Tỉ lệ tốc độ giọng đọc chung")
     fit_mode: Optional[str] = Field("natural_flow", description="Chế độ khớp nhịp")
+    parallel_jobs: Optional[int] = Field(6, ge=1, le=10, description="Số luồng dịch song song (mặc định 6)")
     output_filename: Optional[str] = Field(None, description="Tên file video lồng tiếng xuất ra")
 
 
@@ -750,6 +751,7 @@ async def batch_download_and_dubbing_hongguo(
         tts_speed=req.tts_speed or 1.0,
         voice_rate=req.voice_rate or 1.0,
         fit_mode=req.fit_mode or "natural_flow",
+        parallel_jobs=req.parallel_jobs or 6,
         temp_dir=temp_pipeline_dir,
         log_callback=_log_msg,
         progress_callback=_progress_cb,
