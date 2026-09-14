@@ -818,10 +818,11 @@ async def execute_dubbing_pipeline_for_stream_copy(
         logger.warning(f"[Dubbing Pipeline] Xuất/Upload srt_original.srt thất bại: {exc}")
 
     # 2. Translate Segments
+    tot_segments = len(segments)
     if progress_callback:
-        progress_callback("translate", 35, f"Đang dịch {len(segments)} câu sang '{target_lang}'...")
+        progress_callback("translate", 35, f"Bắt đầu dịch {tot_segments} câu sang '{target_lang}' (còn {tot_segments} câu chưa dịch)...")
     if log_callback:
-        log_callback(f"[Dubbing Pipeline] Bước 2/5: Đang dịch {len(segments)} câu bằng AI model...")
+        log_callback(f"[Dubbing Pipeline] Bước 2/5: Đang dịch {tot_segments} câu bằng AI model...")
 
     def _on_node_event(evt: dict):
         if not isinstance(evt, dict):
@@ -829,11 +830,12 @@ async def execute_dubbing_pipeline_for_stream_copy(
         e_type = evt.get("type") or evt.get("event")
         if e_type == "translate_progress" or evt.get("action") == "translate":
             done_cnt = evt.get("done") or evt.get("completed") or 0
-            tot_cnt = evt.get("total") or len(segments)
+            tot_cnt = evt.get("total") or tot_segments
             if tot_cnt > 0 and done_cnt > 0:
                 sub_pct = min(100, int((done_cnt / tot_cnt) * 100))
+                remaining = max(0, tot_cnt - done_cnt)
                 if progress_callback:
-                    progress_callback("translate", 35 + int(sub_pct * 0.20), f"Đang dịch AI: {done_cnt}/{tot_cnt} câu ({sub_pct}%)")
+                    progress_callback("translate", 35 + int(sub_pct * 0.20), f"Đang dịch AI: {done_cnt}/{tot_cnt} câu (còn {remaining} câu chưa dịch) - {sub_pct}%")
 
     actual_model = model or (settings.get("customModel") if provider == "custom" else settings.get("deepseekModel")) or "gemini-lite"
     translate_data = {
@@ -883,8 +885,10 @@ async def execute_dubbing_pipeline_for_stream_copy(
                 segments[idx]["subtitleText"] = t
                 segments[idx]["dubbingText"] = item.get("dubbingText") or t
 
+    if progress_callback:
+        progress_callback("translate", 55, f"Đã hoàn thành dịch thuật {tot_segments}/{tot_segments} câu (còn 0 câu chưa dịch).")
     if log_callback:
-        log_callback(f"[Dubbing Pipeline] Đã hoàn thành dịch thuật {len(segments)} câu.")
+        log_callback(f"[Dubbing Pipeline] Đã hoàn thành dịch thuật {tot_segments} câu.")
 
     # Tự động xuất và upload srt_translated.srt lên storage.to ngay sau bước Translate
     translated_srt_path = os.path.join(work_dir, "srt_translated.srt")
@@ -907,7 +911,7 @@ async def execute_dubbing_pipeline_for_stream_copy(
     # 3. Generate TTS Batch
     norm_voice = normalize_voice_id(voice_id, "Ngọc Huyền")
     if progress_callback:
-        progress_callback("tts", 55, f"Đang tổng hợp giọng đọc ({norm_voice})...")
+        progress_callback("tts", 55, f"Bắt đầu tạo TTS {tot_segments} câu giọng '{norm_voice}' (còn {tot_segments} câu chưa tạo)...")
     if log_callback:
         log_callback(f"[Dubbing Pipeline] Bước 3/5: Tổng hợp giọng đọc TTS '{norm_voice}'...")
 
@@ -935,6 +939,9 @@ async def execute_dubbing_pipeline_for_stream_copy(
         op_id=op_id,
         language=target_lang,
     )
+
+    if progress_callback:
+        progress_callback("tts", 75, f"Đã hoàn thành tạo TTS {tot_segments}/{tot_segments} câu (còn 0 câu chưa tạo).")
 
     tts_results = tts_batch_res.get("results") or []
     res_map = {str(r.get("id")): r for r in tts_results if isinstance(r, dict)}

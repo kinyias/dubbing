@@ -11,6 +11,24 @@ class ConnectionManager:
     def __init__(self):
         self.active_connections: List[WebSocket] = []
         self._loop: Optional[asyncio.AbstractEventLoop] = None
+        self.local_listeners: List[Any] = []
+
+    def add_listener(self, callback: Any) -> None:
+        """Thêm callback nhận event đồng bộ (cho direct CLI / script không cần WebSocket)."""
+        if callback not in self.local_listeners:
+            self.local_listeners.append(callback)
+
+    def remove_listener(self, callback: Any) -> None:
+        """Gỡ callback nhận event."""
+        if callback in self.local_listeners:
+            self.local_listeners.remove(callback)
+
+    def _notify_local_listeners(self, data: dict) -> None:
+        for cb in list(self.local_listeners):
+            try:
+                cb(data)
+            except Exception:
+                pass
 
     def set_loop(self, loop: asyncio.AbstractEventLoop) -> None:
         """Set or update the main asyncio event loop."""
@@ -49,6 +67,7 @@ class ConnectionManager:
 
     async def broadcast_json(self, data: dict):
         """Send JSON payload to all active WebSocket clients."""
+        self._notify_local_listeners(data)
         if not self.active_connections:
             return
         
@@ -66,6 +85,7 @@ class ConnectionManager:
 
     def broadcast_json_sync(self, data: dict):
         """Thread-safe synchronous broadcast for worker threads."""
+        self._notify_local_listeners(data)
         if not self.active_connections:
             return
         loop = self._get_loop()

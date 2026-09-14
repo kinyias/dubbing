@@ -208,7 +208,7 @@ async def get_hongguo_detail(
 @router.post("/download-batch")
 async def batch_download_hongguo(
     req: BatchDownloadRequest,
-    request: Request
+    request: Request = None
 ):
     """
     Tải video hàng loạt cho phim Hồng Quả:
@@ -464,7 +464,7 @@ async def batch_download_hongguo(
 @router.post("/dubbing")
 async def batch_download_and_dubbing_hongguo(
     req: DubbingBatchRequest,
-    request: Request
+    request: Request = None
 ):
     """
     Tải hàng loạt video Hồng Quả và tự động thực hiện toàn bộ quy trình lồng tiếng:
