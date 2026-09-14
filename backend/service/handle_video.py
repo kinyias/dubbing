@@ -83,6 +83,8 @@ def detect_best_video_encoder(ffmpeg_bin: Optional[str] = None) -> Tuple[str, Li
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 timeout=5,
             )
             if res.returncode == 0:
@@ -124,7 +126,15 @@ def probe_video_detail(file_path: str, ffmpeg_bin: Optional[str] = None) -> Dict
     ]
 
     try:
-        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
+        res = subprocess.run(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=True,
+        )
         data = json.loads(res.stdout)
     except Exception as exc:
         logger.error(f"Lỗi khi probe file {file_path}: {exc}")
@@ -230,7 +240,7 @@ def normalize_video_format(
     ]
 
     logger.info(f"[Normalize Video] Đang render chuẩn hóa file dị biệt: {input_video} -> {output_video} (Encoder: {enc})")
-    res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
     if res.returncode != 0:
         logger.error(f"[Normalize Video] Lỗi render chuẩn hóa video: {res.stderr}")
         # Nếu GPU lỗi, fallback sang CPU libx264
@@ -251,7 +261,7 @@ def normalize_video_format(
                 "-movflags", "+faststart",
                 output_video,
             ]
-            res_cpu = subprocess.run(fallback_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            res_cpu = subprocess.run(fallback_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
             if res_cpu.returncode != 0:
                 raise RuntimeError(f"Lỗi chuẩn hóa video với CPU: {res_cpu.stderr}")
         else:
@@ -390,7 +400,7 @@ def concat_videos_stream_copy(
 
     try:
         logger.info(f"[Concat Stream Copy] Đang ghép {len(video_paths)} video vào '{output_path}'...")
-        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
         if res.returncode != 0:
             logger.error(f"[Concat Stream Copy] Thất bại: {res.stderr}")
             raise RuntimeError(f"FFmpeg concat stream copy thất bại: {res.stderr}")
@@ -445,7 +455,7 @@ def extract_and_concat_clean_audio(
     ]
 
     logger.info(f"[Concat Audio] Đang trích xuất & nối audio chuẩn cho {len(video_paths)} tập...")
-    res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
     if res.returncode != 0:
         logger.error(f"[Concat Audio] Thất bại: {res.stderr}")
         raise RuntimeError(f"Trích xuất & nối audio thất bại: {res.stderr}")
@@ -573,7 +583,7 @@ def create_tts_audio_track(
                 chunk_output_wav,
             ])
 
-            res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
             if os.path.exists(chunk_script_path):
                 try:
                     os.unlink(chunk_script_path)
@@ -609,7 +619,7 @@ def create_tts_audio_track(
                 "-c:a", "pcm_s16le",
                 output_tts_wav,
             ])
-            res_final = subprocess.run(cmd_mix, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            res_final = subprocess.run(cmd_mix, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
             if res_final.returncode != 0:
                 raise RuntimeError(f"Lỗi ghép các chunks TTS: {res_final.stderr}")
     finally:
@@ -664,7 +674,7 @@ def mux_video_with_ducked_background_and_tts(
     logger.info(
         f"[Mux Final Video] Đang mix audio (Background vol=0.1 & periodic 0.1s mute, TTS) và ghép video stream copy -> '{output_video_file}'"
     )
-    res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
     if res.returncode != 0:
         logger.error(f"[Mux Final Video] Lỗi mux video & audio: {res.stderr}")
         raise RuntimeError(f"Lỗi khi ghép audio và video stream copy: {res.stderr}")

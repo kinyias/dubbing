@@ -65,7 +65,15 @@ def probe_media_file(file_path: str, ffmpeg_bin_path: Optional[str] = None) -> D
     ]
     
     try:
-        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
+        res = subprocess.run(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=True,
+        )
         data = json.loads(res.stdout)
         
         format_info = data.get("format", {})

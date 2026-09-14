@@ -158,7 +158,7 @@ def probe_video_metadata(video_path: str, ffmpeg_bin: str = "ffmpeg") -> Dict[st
         video_path,
     ]
     try:
-        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, text=True)
+        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, text=True, encoding="utf-8", errors="replace")
         data = json.loads(res.stdout)
         duration = 0.0
         if "format" in data and "duration" in data["format"]:
