@@ -26,6 +26,36 @@ from service.setting import load_transcript_settings
 logger = logging.getLogger("router_custom_transcript")
 
 router = APIRouter(prefix="/api/transcript", tags=["transcript"])
+
+# ===========================================================================
+# CẤU HÌNH BIẾN CHUNG CHO SỐ LUỒNG DỊCH SEGMENTS
+# ===========================================================================
+DEFAULT_TRANSLATE_PARALLEL_JOBS: int = 10
+TRANSLATE_PARALLEL_JOBS: int = DEFAULT_TRANSLATE_PARALLEL_JOBS
+
+
+def get_translate_parallel_jobs() -> int:
+    """
+    Lấy số luồng dịch segments song song đang được cấu hình.
+    """
+    return TRANSLATE_PARALLEL_JOBS
+
+
+def set_translate_parallel_jobs(jobs: Union[int, str]) -> int:
+    """
+    Thiết lập số luồng dịch segments song song chung.
+    """
+    global TRANSLATE_PARALLEL_JOBS, DEFAULT_TRANSLATE_PARALLEL_JOBS
+    try:
+        val = max(1, int(jobs))
+    except (ValueError, TypeError):
+        val = 10
+    TRANSLATE_PARALLEL_JOBS = val
+    DEFAULT_TRANSLATE_PARALLEL_JOBS = val
+    logger.info(f"[Translate] Đã cập nhật số luồng dịch segments chung: {val}")
+    return val
+
+
 class TranslateRequest(BaseModel):
     segments: Optional[List[Dict[str, Any]]] = Field(default_factory=list)
     targetLang: Optional[str] = "vi"
@@ -34,7 +64,10 @@ class TranslateRequest(BaseModel):
     preset: Optional[str] = "default"
     model: Optional[str] = None
     provider: Optional[str] = None
-    parallelJobs: Optional[int] = 1
+    parallelJobs: Optional[int] = Field(
+        default_factory=get_translate_parallel_jobs,
+        description="Số luồng dịch song song (mặc định lấy từ biến chung TRANSLATE_PARALLEL_JOBS = 10)",
+    )
     glossary: Optional[List[Any]] = Field(default_factory=list)
     bible: Optional[Any] = None
     speakers: Optional[List[Any]] = Field(default_factory=list)
@@ -48,6 +81,20 @@ class TranslateRequest(BaseModel):
 # ===========================================================================
 # TRANSLATION ROUTES
 # ===========================================================================
+
+@router.get("/translate-parallel-jobs")
+async def api_get_translate_parallel_jobs():
+    """Lấy số luồng dịch segments cấu hình hiện tại."""
+    return {"parallelJobs": get_translate_parallel_jobs()}
+
+
+@router.post("/translate-parallel-jobs")
+async def api_set_translate_parallel_jobs(payload: Dict[str, Any]):
+    """Thiết lập số luồng dịch segments chung qua API."""
+    jobs = payload.get("parallelJobs") or payload.get("parallel_jobs") or DEFAULT_TRANSLATE_PARALLEL_JOBS
+    val = set_translate_parallel_jobs(jobs)
+    return {"parallelJobs": val, "status": "success"}
+
 
 @router.post("/translate-segments")
 async def api_translate_segments(req_payload: Union[TranslateRequest, Dict[str, Any]]):
@@ -77,6 +124,25 @@ async def api_translate_segments(req_payload: Union[TranslateRequest, Dict[str, 
 
     video_path = req.get("videoPath") or req.get("video_path")
 
+    # Xác định số luồng dịch segments:
+    # 1. parallelJobs từ request (nếu được chỉ định rõ ràng)
+    # 2. translateParallelJobs từ settings.json (nếu có)
+    # 3. Biến chung TRANSLATE_PARALLEL_JOBS (mặc định 10)
+    raw_parallel = req.get("parallelJobs")
+    if raw_parallel is not None:
+        try:
+            parallel_jobs = int(raw_parallel)
+            if parallel_jobs <= 0:
+                parallel_jobs = get_translate_parallel_jobs()
+        except (ValueError, TypeError):
+            parallel_jobs = get_translate_parallel_jobs()
+    else:
+        setting_parallel = settings.get("translateParallelJobs")
+        try:
+            parallel_jobs = int(setting_parallel) if setting_parallel else get_translate_parallel_jobs()
+        except (ValueError, TypeError):
+            parallel_jobs = get_translate_parallel_jobs()
+
     # Chuẩn bị dữ liệu gửi sang Node.js helper 
     data: Dict[str, Any] = {
         "segments": req.get("segments"),
@@ -86,7 +152,7 @@ async def api_translate_segments(req_payload: Union[TranslateRequest, Dict[str, 
         "preset": req.get("preset"),
         "model": req.get("model"),
         "provider": req.get("provider"),
-        "parallelJobs": req.get("parallelJobs"),
+        "parallelJobs": parallel_jobs,
         "glossary": req.get("glossary"),
         "bible": req.get("bible"),
         "speakers": req.get("speakers"),

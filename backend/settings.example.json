@@ -19,7 +19,7 @@
     "translateSourceLang": "auto",
     "translateTargetLang": "vi",
     "translatePromptPreset": "default",
-    "translateParallelJobs": 1,
+    "translateParallelJobs": 10,
     "translatePolishPass": false,
     "translateGlossary": "",
     "customApiEndpoint": "http://localhost:20128/v1",
