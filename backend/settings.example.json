@@ -42,7 +42,8 @@
             "maxBatchSize": 128,
             "threads": 0,
             "engine": "vieneu",
-            "gpuSlot": "on"
+            "gpuSlot": "on",
+            "temperature": 0.5
         }
     },
     "transcribeEngine": "capcut",

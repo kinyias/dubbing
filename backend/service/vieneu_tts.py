@@ -203,6 +203,7 @@ def generate_tts_batch_sync(
     local_tts = settings.get("localTts", {})
     vieneu_cfg = local_tts.get("vieneu", {}) if isinstance(local_tts, dict) else {}
     max_batch_size = int(vieneu_cfg.get("maxBatchSize", 8) or 8)
+    temperature = float(vieneu_cfg.get("temperature", 0.5) if vieneu_cfg.get("temperature") is not None else 0.5)
     default_voice_setting = settings.get("defaultTtsVoice") or settings.get("ttsVoice") or "vieneu:Ngọc Huyền"
     default_voice = normalize_voice_id(default_voice_setting, "Ngọc Huyền")
     ffmpeg_path = settings.get("ffmpegPath") or "ffmpeg"
@@ -254,10 +255,15 @@ def generate_tts_batch_sync(
 
                 try:
                     t0 = time.time()
-                    audios = engine.infer_batch(texts, voice=voice, batch_size=max_batch_size)
+                    audios = engine.infer_batch(
+                        texts,
+                        voice=voice,
+                        batch_size=max_batch_size,
+                        temperature=temperature,
+                    )
                     elapsed = time.time() - t0
                     logger.info(
-                        f"[VieNeu] Batch {len(texts)} câu (voice: '{voice}') hoàn thành trong {elapsed:.2f}s"
+                        f"[VieNeu] Batch {len(texts)} câu (voice: '{voice}', temp: {temperature}) hoàn thành trong {elapsed:.2f}s"
                     )
                 except Exception as e:
                     logger.warning(
@@ -267,7 +273,7 @@ def generate_tts_batch_sync(
                     audios = []
                     for t in texts:
                         try:
-                            a = engine.infer(t, voice=voice)
+                            a = engine.infer(t, voice=voice, temperature=temperature)
                             audios.append(a)
                         except Exception as e_ind:
                             logger.error(f"[VieNeu] Lỗi infer đơn lẻ cho text '{t[:30]}...': {e_ind}")
