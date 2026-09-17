@@ -138,10 +138,9 @@ async def resolve_output_path_endpoint(body: Dict[str, Any]):
 
 
 @router.post("/probe-media")
-@router.post("/import-video")
 async def probe_media_endpoint(body: Dict[str, Any]):
     """Probes media metadata (duration, width, height, fps)."""
-    file_path = body.get("filePath") or body.get("sourceVideo")
+    file_path = body.get("filePath") or body.get("sourceVideo") or body.get("path")
     if not file_path:
         raise HTTPException(status_code=400, detail="Missing filePath parameter")
         
