@@ -294,6 +294,85 @@ def run_node_helper_sync(
     )
 
 
+async def generate_tts(
+    text: str,
+    voice_id: str,
+    dest_path: str,
+    speed: float = 1.0,
+    op_id: Optional[str] = None,
+    settings: Optional[dict] = None,
+    on_log: Optional[Callable[[str], Any]] = None,
+    on_event: Optional[Callable[[dict], Any]] = None,
+    helper_path: Optional[str] = None,
+) -> dict[str, Any]:
+    """
+    Tổng hợp giọng nói (CapCut TTS, Edge, ElevenLabs, FPT, Vbee, Zalo...)
+    thông qua action 'generate-tts' của node_helper.js.
+    """
+    if not dest_path:
+        raise ValueError("dest_path không được để trống")
+
+    parent_dir = os.path.dirname(os.path.abspath(dest_path))
+    if parent_dir and not os.path.exists(parent_dir):
+        os.makedirs(parent_dir, exist_ok=True)
+
+    data: dict[str, Any] = {
+        "text": text,
+        "voiceId": voice_id,
+        "destPath": dest_path,
+        "outputPath": dest_path,
+        "speed": float(speed) if speed else 1.0,
+    }
+    if op_id:
+        data["opId"] = op_id
+        data["op_id"] = op_id
+
+    result = await run_node_helper(
+        action="generate-tts",
+        data=data,
+        settings=settings,
+        on_log=on_log,
+        on_event=on_event,
+        helper_path=helper_path,
+    )
+
+    if not isinstance(result, dict):
+        result = {
+            "success": os.path.exists(dest_path) and os.path.getsize(dest_path) > 44,
+            "outputPath": dest_path,
+            "validAudio": os.path.exists(dest_path) and os.path.getsize(dest_path) > 44,
+        }
+    return result
+
+
+def generate_tts_sync(
+    text: str,
+    voice_id: str,
+    dest_path: str,
+    speed: float = 1.0,
+    op_id: Optional[str] = None,
+    settings: Optional[dict] = None,
+    on_log: Optional[Callable[[str], Any]] = None,
+    on_event: Optional[Callable[[dict], Any]] = None,
+    helper_path: Optional[str] = None,
+) -> dict[str, Any]:
+    """Chạy generate_tts đồng bộ (sync)."""
+    return asyncio.run(
+        generate_tts(
+            text=text,
+            voice_id=voice_id,
+            dest_path=dest_path,
+            speed=speed,
+            op_id=op_id,
+            settings=settings,
+            on_log=on_log,
+            on_event=on_event,
+            helper_path=helper_path,
+        )
+    )
+
+
+
 if __name__ == "__main__":
     if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
         try:

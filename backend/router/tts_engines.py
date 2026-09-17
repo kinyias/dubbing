@@ -1,17 +1,21 @@
 """
-Router API cho phân hệ TTS (Text-to-Speech) — VieNeu-TTS.
-Cung cấp route /api/transcript/generate-tts-batch cùng các endpoint phụ trợ (cancel, single tts, voice list).
+Router API cho phân hệ TTS (Text-to-Speech) — Hỗ trợ song song VieNeu-TTS (GPU) và CapCut TTS (qua node_bridge).
+Cung cấp route /api/transcript/generate-tts, /api/transcript/generate-tts-batch, /api/transcript/generate-capcut-tts cùng các endpoint phụ trợ.
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
+import os
+import tempfile
+import uuid
 from typing import Any, Dict, List, Optional, Union
 
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
+from core.node_bridge import generate_tts as node_generate_tts
 from core.ws_manager import ws_manager
 from backend.service.vieneu_tts import (
     cancel_tts_op,
@@ -23,6 +27,56 @@ from backend.service.vieneu_tts import (
 logger = logging.getLogger("router_tts_engines")
 
 router = APIRouter(prefix="/api/transcript", tags=["tts"])
+
+
+# ===========================================================================
+# HELPER FUNCTIONS
+# ===========================================================================
+
+def is_vieneu_voice(voice_id: Optional[str]) -> bool:
+    """Kiểm tra ID giọng có phải thuộc VieNeu-TTS hay không."""
+    if not voice_id:
+        return False
+    v = str(voice_id).strip().lower()
+    return v.startswith("vieneu:")
+
+
+def normalize_capcut_voice_id(voice_id: Optional[str]) -> str:
+    """Chuẩn hóa voiceId cho CapCut TTS / node_helper."""
+    if not voice_id:
+        return "bv:vi_female_huong"
+    v = str(voice_id).strip()
+    if v.lower().startswith("capcut:"):
+        v = v[7:].strip()
+    return v or "bv:vi_female_huong"
+
+
+def probe_audio_info(file_path: str) -> tuple[float, int]:
+    """
+    Đo thời lượng (durationSeconds) và dung lượng (sizeBytes) của file audio.
+    """
+    if not file_path or not os.path.exists(file_path):
+        return 0.0, 0
+    size_bytes = os.path.getsize(file_path)
+    dur = 0.0
+    try:
+        import soundfile as sf
+        info = sf.info(file_path)
+        dur = float(info.duration)
+        return dur, size_bytes
+    except Exception:
+        pass
+
+    try:
+        import torchaudio
+        si = torchaudio.info(file_path)
+        if si.sample_rate > 0:
+            dur = float(si.num_frames) / float(si.sample_rate)
+            return dur, size_bytes
+    except Exception:
+        pass
+
+    return dur, size_bytes
 
 
 # ===========================================================================
@@ -56,7 +110,8 @@ class TtsBatchRequest(BaseModel):
 
 class TtsSingleRequest(BaseModel):
     text: str = Field(..., description="Nội dung văn bản cần đọc")
-    voiceId: Optional[str] = Field(None, description="ID giọng đọc (ví dụ: 'vieneu:Ngọc Huyền')")
+    voiceId: Optional[str] = Field(None, description="ID giọng đọc (ví dụ: 'vieneu:Ngọc Huyền', 'bv:vi_female_huong')")
+    engine: Optional[str] = Field(None, description="Engine TTS: 'vieneu', 'capcut' (tự động nhận diện nếu bỏ trống)")
     destPath: Optional[str] = Field(None, description="Đường dẫn file đầu ra")
     outputPath: Optional[str] = Field(None, description="Bí danh thay thế cho destPath")
     speed: Optional[float] = Field(1.0, description="Tốc độ đọc")
@@ -133,6 +188,7 @@ async def api_generate_tts_batch(req_payload: Union[TtsBatchRequest, Dict[str, A
         )
 
 
+
 @router.post("/cancel-tts-batch")
 @router.post("/cancel-tts")
 async def api_cancel_tts_batch(body: Union[CancelTtsRequest, Dict[str, Any]]):
@@ -156,10 +212,13 @@ async def api_cancel_tts_batch(body: Union[CancelTtsRequest, Dict[str, Any]]):
 
 
 @router.post("/generate-tts")
+@router.post("/generate-capcut-tts")
 async def api_generate_tts_single(req_payload: Union[TtsSingleRequest, Dict[str, Any]]):
     """
     Endpoint tổng hợp âm thanh cho 1 câu đơn lẻ (/api/transcript/generate-tts).
-    Tương thích với action 'generate-tts' từ node_helper / TtsRouter.
+    Tự động định tuyến:
+    - Nếu voiceId là giọng CapCut (hoặc engine='capcut') -> Gọi node_bridge.generate_tts.
+    - Nếu voiceId là giọng VieNeu -> Gọi VieNeu-TTS (GPU).
     """
     if hasattr(req_payload, "model_dump"):
         req = req_payload.model_dump()
@@ -168,42 +227,105 @@ async def api_generate_tts_single(req_payload: Union[TtsSingleRequest, Dict[str,
     else:
         req = dict(req_payload)
 
-    text = req.get("text") or ""
-    voice_id = req.get("voiceId") or "vieneu:Ngọc Huyền"
+    text = (req.get("text") or "").strip()
+    voice_id = req.get("voiceId") or req.get("voice_id")
     dest_path = req.get("destPath") or req.get("outputPath")
     speed = float(req.get("speed") or 1.0)
-    op_id = req.get("opId")
+    op_id = req.get("opId") or req.get("op_id")
+    explicit_engine = (req.get("engine") or "").lower().strip()
 
-    single_item = {
-        "id": "single_0",
-        "text": text,
-        "voiceId": voice_id,
-        "destPath": dest_path,
-        "speed": speed,
-    }
+    if not text:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Nội dung văn bản (text) không được để trống",
+        )
 
-    res = await asyncio.to_thread(
-        generate_tts_batch_sync,
-        items=[single_item],
-        op_id=op_id,
+    # Nhận diện engine: CapCut vs VieNeu
+    is_capcut = (
+        explicit_engine == "capcut"
+        or (voice_id and not is_vieneu_voice(voice_id))
     )
 
-    results = res.get("results") or []
-    if results and results[0].get("success"):
-        first = results[0]
-        return {
-            "success": True,
-            "outputPath": first.get("outputPath"),
-            "validAudio": first.get("validAudio", True),
-            "durationSeconds": first.get("durationSeconds", 0.0),
-            "sizeBytes": first.get("sizeBytes", 0),
-        }
-    else:
-        err_msg = results[0].get("error") if results else "Unknown error"
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Lỗi tổng hợp giọng nói: {err_msg}",
+    if is_capcut:
+        # === 1. XỬ LÝ QUA CAPCUT TTS / NODE BRIDGE ===
+        clean_voice_id = normalize_capcut_voice_id(voice_id)
+        if not dest_path:
+            dest_path = os.path.join(tempfile.gettempdir(), f"tts_capcut_{uuid.uuid4().hex}.mp3")
+
+        logger.info(
+            f"[TTS Single] Đang tạo CapCut TTS qua node_bridge: voiceId='{clean_voice_id}', speed={speed}, destPath='{dest_path}'"
         )
+        try:
+            res = await node_generate_tts(
+                text=text,
+                voice_id=clean_voice_id,
+                dest_path=dest_path,
+                speed=speed,
+                op_id=op_id,
+            )
+            out_path = res.get("outputPath") or dest_path
+            dur, size = probe_audio_info(out_path)
+            valid = bool(res.get("validAudio", True) and os.path.exists(out_path) and size > 44)
+            return {
+                "success": True,
+                "outputPath": out_path,
+                "validAudio": valid,
+                "durationSeconds": dur,
+                "sizeBytes": size,
+                "engine": "capcut",
+                "voiceId": clean_voice_id,
+            }
+        except Exception as e:
+            logger.error(f"[TTS Single] Lỗi khi tạo CapCut TTS qua node_bridge: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Lỗi tổng hợp giọng nói CapCut: {str(e)}",
+            )
+    else:
+        # === 2. XỬ LÝ QUA VIENEU-TTS (GPU) ===
+        target_voice_id = voice_id or "vieneu:Ngọc Huyền"
+        if not dest_path:
+            dest_path = os.path.join(tempfile.gettempdir(), f"tts_vieneu_{uuid.uuid4().hex}.wav")
+
+        single_item = {
+            "id": "single_0",
+            "text": text,
+            "voiceId": target_voice_id,
+            "destPath": dest_path,
+            "speed": speed,
+        }
+
+        res = await asyncio.to_thread(
+            generate_tts_batch_sync,
+            items=[single_item],
+            op_id=op_id,
+        )
+
+        results = res.get("results") or []
+        if results and results[0].get("success"):
+            first = results[0]
+            out_path = first.get("outputPath") or dest_path
+            dur, size = probe_audio_info(out_path)
+            if dur <= 0.0:
+                dur = float(first.get("durationSeconds", 0.0))
+            if size <= 0:
+                size = int(first.get("sizeBytes", 0))
+
+            return {
+                "success": True,
+                "outputPath": out_path,
+                "validAudio": first.get("validAudio", True),
+                "durationSeconds": dur,
+                "sizeBytes": size,
+                "engine": "vieneu",
+                "voiceId": target_voice_id,
+            }
+        else:
+            err_msg = results[0].get("error") if results else "Unknown error"
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Lỗi tổng hợp giọng nói VieNeu: {err_msg}",
+            )
 
 
 @router.get("/vieneu-voices")
@@ -226,3 +348,4 @@ async def api_get_vieneu_voices():
             for label, v_id in voices
         ],
     }
+
