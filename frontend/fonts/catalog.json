@@ -1,0 +1,401 @@
+{
+  "schema": 1,
+  "fonts": [
+    {
+      "family": "Archivo",
+      "file": "archivo.ttf",
+      "category": "Sans",
+      "bytes": 110708
+    },
+    {
+      "family": "Asap",
+      "file": "asap.ttf",
+      "category": "Sans",
+      "bytes": 69844
+    },
+    {
+      "family": "Athiti",
+      "file": "athiti.ttf",
+      "category": "Sans",
+      "bytes": 169392
+    },
+    {
+      "family": "Barlow",
+      "file": "barlow.ttf",
+      "category": "Sans",
+      "bytes": 82624
+    },
+    {
+      "family": "Be Vietnam Pro",
+      "file": "be-vietnam-pro.ttf",
+      "category": "Sans",
+      "bytes": 120228
+    },
+    {
+      "family": "Cabin",
+      "file": "cabin.ttf",
+      "category": "Sans",
+      "bytes": 74556
+    },
+    {
+      "family": "Chivo",
+      "file": "chivo.ttf",
+      "category": "Sans",
+      "bytes": 78900
+    },
+    {
+      "family": "Epilogue",
+      "file": "epilogue.ttf",
+      "category": "Sans",
+      "bytes": 69744
+    },
+    {
+      "family": "Exo 2",
+      "file": "exo-2.ttf",
+      "category": "Sans",
+      "bytes": 143780
+    },
+    {
+      "family": "Inter",
+      "file": "inter.ttf",
+      "category": "Sans",
+      "bytes": 324820
+    },
+    {
+      "family": "Kanit",
+      "file": "kanit.ttf",
+      "category": "Sans",
+      "bytes": 168768
+    },
+    {
+      "family": "Lexend",
+      "file": "lexend.ttf",
+      "category": "Sans",
+      "bytes": 70700
+    },
+    {
+      "family": "Manrope",
+      "file": "manrope.ttf",
+      "category": "Sans",
+      "bytes": 94972
+    },
+    {
+      "family": "Montserrat",
+      "file": "montserrat.ttf",
+      "category": "Sans",
+      "bytes": 180068
+    },
+    {
+      "family": "Mulish",
+      "file": "mulish.ttf",
+      "category": "Sans",
+      "bytes": 103364
+    },
+    {
+      "family": "Nunito",
+      "file": "nunito.ttf",
+      "category": "Sans",
+      "bytes": 125528
+    },
+    {
+      "family": "Nunito Sans",
+      "file": "nunito-sans.ttf",
+      "category": "Sans",
+      "bytes": 106700
+    },
+    {
+      "family": "Open Sans",
+      "file": "open-sans.ttf",
+      "category": "Sans",
+      "bytes": 122116
+    },
+    {
+      "family": "Oswald",
+      "file": "oswald.ttf",
+      "category": "Sans",
+      "bytes": 86068
+    },
+    {
+      "family": "Plus Jakarta Sans",
+      "file": "plus-jakarta-sans.ttf",
+      "category": "Sans",
+      "bytes": 63336
+    },
+    {
+      "family": "Prompt",
+      "file": "prompt.ttf",
+      "category": "Sans",
+      "bytes": 152988
+    },
+    {
+      "family": "Public Sans",
+      "file": "public-sans.ttf",
+      "category": "Sans",
+      "bytes": 56172
+    },
+    {
+      "family": "Quicksand",
+      "file": "quicksand.ttf",
+      "category": "Sans",
+      "bytes": 73224
+    },
+    {
+      "family": "Raleway",
+      "file": "raleway.ttf",
+      "category": "Sans",
+      "bytes": 138808
+    },
+    {
+      "family": "Roboto",
+      "file": "roboto.ttf",
+      "category": "Sans",
+      "bytes": 123720
+    },
+    {
+      "family": "Saira",
+      "file": "saira.ttf",
+      "category": "Sans",
+      "bytes": 70316
+    },
+    {
+      "family": "Sarabun",
+      "file": "sarabun.ttf",
+      "category": "Sans",
+      "bytes": 81516
+    },
+    {
+      "family": "Source Sans 3",
+      "file": "source-sans-3.ttf",
+      "category": "Sans",
+      "bytes": 234708
+    },
+    {
+      "family": "Space Grotesk",
+      "file": "space-grotesk.ttf",
+      "category": "Sans",
+      "bytes": 69360
+    },
+    {
+      "family": "Work Sans",
+      "file": "work-sans.ttf",
+      "category": "Sans",
+      "bytes": 114144
+    },
+    {
+      "family": "Bitter",
+      "file": "bitter.ttf",
+      "category": "Serif",
+      "bytes": 149332
+    },
+    {
+      "family": "Cormorant",
+      "file": "cormorant.ttf",
+      "category": "Serif",
+      "bytes": 177332
+    },
+    {
+      "family": "Faustina",
+      "file": "faustina.ttf",
+      "category": "Serif",
+      "bytes": 69488
+    },
+    {
+      "family": "Literata",
+      "file": "literata.ttf",
+      "category": "Serif",
+      "bytes": 170668
+    },
+    {
+      "family": "Lora",
+      "file": "lora.ttf",
+      "category": "Serif",
+      "bytes": 132188
+    },
+    {
+      "family": "Merriweather",
+      "file": "merriweather.ttf",
+      "category": "Serif",
+      "bytes": 585976
+    },
+    {
+      "family": "Noto Serif",
+      "file": "noto-serif.ttf",
+      "category": "Serif",
+      "bytes": 444064
+    },
+    {
+      "family": "Playfair Display",
+      "file": "playfair-display.ttf",
+      "category": "Serif",
+      "bytes": 123240
+    },
+    {
+      "family": "Roboto Slab",
+      "file": "roboto-slab.ttf",
+      "category": "Serif",
+      "bytes": 101564
+    },
+    {
+      "family": "Source Serif 4",
+      "file": "source-serif-4.ttf",
+      "category": "Serif",
+      "bytes": 194464
+    },
+    {
+      "family": "Vollkorn",
+      "file": "vollkorn.ttf",
+      "category": "Serif",
+      "bytes": 228856
+    },
+    {
+      "family": "Alfa Slab One",
+      "file": "alfa-slab-one.ttf",
+      "category": "Display",
+      "bytes": 91272
+    },
+    {
+      "family": "Anton",
+      "file": "anton.ttf",
+      "category": "Display",
+      "bytes": 130324
+    },
+    {
+      "family": "Bangers",
+      "file": "bangers.ttf",
+      "category": "Display",
+      "bytes": 92468
+    },
+    {
+      "family": "Baloo 2",
+      "file": "baloo-2.ttf",
+      "category": "Display",
+      "bytes": 417848
+    },
+    {
+      "family": "Bungee",
+      "file": "bungee.ttf",
+      "category": "Display",
+      "bytes": 110456
+    },
+    {
+      "family": "Bungee Inline",
+      "file": "bungee-inline.ttf",
+      "category": "Display",
+      "bytes": 143792
+    },
+    {
+      "family": "Bungee Shade",
+      "file": "bungee-shade.ttf",
+      "category": "Display",
+      "bytes": 293136
+    },
+    {
+      "family": "Chonburi",
+      "file": "chonburi.ttf",
+      "category": "Display",
+      "bytes": 165956
+    },
+    {
+      "family": "Coiny",
+      "file": "coiny.ttf",
+      "category": "Display",
+      "bytes": 136380
+    },
+    {
+      "family": "Comfortaa",
+      "file": "comfortaa.ttf",
+      "category": "Display",
+      "bytes": 110000
+    },
+    {
+      "family": "Grandstander",
+      "file": "grandstander.ttf",
+      "category": "Display",
+      "bytes": 83368
+    },
+    {
+      "family": "Rowdies",
+      "file": "rowdies.ttf",
+      "category": "Display",
+      "bytes": 74648
+    },
+    {
+      "family": "Sigmar One",
+      "file": "sigmar-one.ttf",
+      "category": "Display",
+      "bytes": 165016
+    },
+    {
+      "family": "Charm",
+      "file": "charm.ttf",
+      "category": "Handwriting",
+      "bytes": 121388
+    },
+    {
+      "family": "Charmonman",
+      "file": "charmonman.ttf",
+      "category": "Handwriting",
+      "bytes": 100980
+    },
+    {
+      "family": "Dancing Script",
+      "file": "dancing-script.ttf",
+      "category": "Handwriting",
+      "bytes": 76340
+    },
+    {
+      "family": "Itim",
+      "file": "itim.ttf",
+      "category": "Handwriting",
+      "bytes": 353128
+    },
+    {
+      "family": "Lobster",
+      "file": "lobster.ttf",
+      "category": "Handwriting",
+      "bytes": 392208
+    },
+    {
+      "family": "Mali",
+      "file": "mali.ttf",
+      "category": "Handwriting",
+      "bytes": 104556
+    },
+    {
+      "family": "Pattaya",
+      "file": "pattaya.ttf",
+      "category": "Handwriting",
+      "bytes": 338272
+    },
+    {
+      "family": "Sriracha",
+      "file": "sriracha.ttf",
+      "category": "Handwriting",
+      "bytes": 308668
+    },
+    {
+      "family": "IBM Plex Mono",
+      "file": "ibm-plex-mono.ttf",
+      "category": "Mono",
+      "bytes": 128812
+    },
+    {
+      "family": "JetBrains Mono",
+      "file": "jetbrains-mono.ttf",
+      "category": "Mono",
+      "bytes": 112172
+    },
+    {
+      "family": "Roboto Mono",
+      "file": "roboto-mono.ttf",
+      "category": "Mono",
+      "bytes": 78948
+    },
+    {
+      "family": "Space Mono",
+      "file": "space-mono.ttf",
+      "category": "Mono",
+      "bytes": 81124
+    }
+  ]
+}
